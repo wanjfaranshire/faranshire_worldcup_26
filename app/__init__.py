@@ -9,21 +9,18 @@ login_manager = LoginManager()
 def create_app():
     app = Flask(__name__)
 
-    # === FORCE POSTGRESQL ON RENDER ===
+    # Database configuration
     database_url = os.environ.get('DATABASE_URL')
 
     if database_url:
-        # Fix Render's postgres:// prefix
         if database_url.startswith("postgres://"):
             database_url = database_url.replace("postgres://", "postgresql://", 1)
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        print("🚀 Using PostgreSQL (Render)")
+        print("🚀 Using PostgreSQL")
     else:
-        # Local development fallback
-        instance_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'instance')
-        if not os.path.exists(instance_path):
-            os.makedirs(instance_path)
-        db_path = os.path.join(instance_path, 'worldcup.db')
+        if not os.path.exists('instance'):
+            os.makedirs('instance')
+        db_path = os.path.join(os.path.abspath('instance'), 'worldcup.db')
         app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
         print("💻 Using SQLite (Local)")
 
@@ -35,6 +32,8 @@ def create_app():
     login_manager.login_view = 'main.login'
 
     from .models import User
+    from .models import Match
+    from .models import Bet
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -42,5 +41,9 @@ def create_app():
 
     from . import routes
     app.register_blueprint(routes.bp)
+
+    # ✅ Create tables on startup
+    with app.app_context():
+        db.create_all()
 
     return app
