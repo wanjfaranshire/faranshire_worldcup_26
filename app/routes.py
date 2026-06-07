@@ -505,3 +505,37 @@ def claim_bonus():
 
     # Redirect with query param to trigger confetti
     return redirect(url_for('main.how_to_play', claimed='true'))
+
+@bp.route('/seed')
+def seed_database():
+    from app.models import Match
+    import pandas as pd
+    from datetime import datetime
+
+    db.create_all()   # Create tables if they don't exist
+
+    # Delete old data
+    Match.query.delete()
+    db.session.commit()
+
+    df = pd.read_excel('group_schedule.xlsx')
+
+    for _, row in df.iterrows():
+        match_date = pd.to_datetime(row['date'])
+        match_time = pd.to_datetime(row['time'])
+        full_date = datetime.combine(match_date.date(), match_time.time())
+
+        group = str(row.get('team1_code', ''))[0] if str(row.get('team1_code', '')) else None
+
+        match = Match(
+            team1=row['team1'],
+            team2=row['team2'],
+            date=full_date,
+            stage="Group Stage",
+            group=group,
+            venue=row.get('venue', '')
+        )
+        db.session.add(match)
+
+    db.session.commit()
+    return f"✅ Successfully seeded {len(df)} matches!"
