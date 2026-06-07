@@ -508,33 +508,37 @@ def claim_bonus():
 
 @bp.route('/seed')
 def seed_database():
-    from app.models import Match
-    from datetime import datetime
+    try:
+        from app.models import Match
+        import pandas as pd
+        from datetime import datetime
 
-    db.create_all()
+        db.create_all()
 
-    # Clear existing matches
-    Match.query.delete()
-    db.session.commit()
+        Match.query.delete()
+        db.session.commit()
 
-    # Manual seeding (you can expand this later)
-    matches_data = [
-        # Add a few sample matches here for testing
-        {"team1": "Mexico", "team2": "South Africa", "date": "2026-06-12 03:00:00", "group": "A", "venue": "Mexico City"},
-        {"team1": "Germany", "team2": "Japan", "date": "2026-06-12 10:00:00", "group": "B", "venue": "Berlin"},
-        # Add more as needed
-    ]
+        df = pd.read_excel('group_schedule.xlsx')
 
-    for data in matches_data:
-        match = Match(
-            team1=data["team1"],
-            team2=data["team2"],
-            date=datetime.fromisoformat(data["date"]),
-            stage="Group Stage",
-            group=data["group"],
-            venue=data["venue"]
-        )
-        db.session.add(match)
+        for _, row in df.iterrows():
+            match_date = pd.to_datetime(row['date'])
+            match_time = pd.to_datetime(row['time'])
+            full_date = datetime.combine(match_date.date(), match_time.time())
 
-    db.session.commit()
-    return "✅ Database seeded successfully with sample matches!"
+            group = str(row.get('team1_code', ''))[0] if str(row.get('team1_code', '')) else None
+
+            match = Match(
+                team1=row['team1'],
+                team2=row['team2'],
+                date=full_date,
+                stage="Group Stage",
+                group=group,
+                venue=row.get('venue', '')
+            )
+            db.session.add(match)
+
+        db.session.commit()
+        return f"✅ Successfully seeded {len(df)} matches from Excel!"
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
