@@ -9,23 +9,22 @@ login_manager = LoginManager()
 def create_app():
     app = Flask(__name__)
 
-    # Get absolute path for instance folder
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    project_root = os.path.dirname(basedir)
-    instance_dir = os.path.join(project_root, 'instance')
-
-    if not os.path.exists(instance_dir):
-        os.makedirs(instance_dir)
-
-    # Database configuration
+    # Force PostgreSQL if DATABASE_URL exists
     database_url = os.environ.get('DATABASE_URL')
 
-    if database_url and database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    if database_url:
+        # Fix Render's postgres:// to postgresql://
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        print("✅ Using PostgreSQL database")
     else:
-        db_file = os.path.join(instance_dir, 'worldcup.db')
-        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
+        # Fallback for local development
+        if not os.path.exists('instance'):
+            os.makedirs('instance')
+        db_path = os.path.join(os.path.abspath('instance'), 'worldcup.db')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        print("✅ Using SQLite (local)")
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -34,17 +33,13 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = 'main.login'
 
-    from . import routes
-    app.register_blueprint(routes.bp)
-
     from .models import User
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    # ✅ Force create tables on every startup (important for Render free tier)
-    with app.app_context():
-        db.create_all()
+    from . import routes
+    app.register_blueprint(routes.bp)
 
     return app
