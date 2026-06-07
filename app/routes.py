@@ -513,35 +513,42 @@ def seed_database():
         import pandas as pd
         from datetime import datetime
 
+        # Force create all tables
         db.create_all()
 
+        # Clear existing data
         Match.query.delete()
         db.session.commit()
 
         df = pd.read_excel('group_schedule.xlsx')
 
+        count = 0
         for _, row in df.iterrows():
-            match_date = pd.to_datetime(row['date'])
-            match_time = pd.to_datetime(row['time'])
-            full_date = datetime.combine(match_date.date(), match_time.time())
+            try:
+                match_date = pd.to_datetime(row['date'])
+                match_time = pd.to_datetime(row['time'])
+                full_date = datetime.combine(match_date.date(), match_time.time())
 
-            group = str(row.get('team1_code', ''))[0] if str(row.get('team1_code', '')) else None
+                group = str(row.get('team1_code', ''))[0] if str(row.get('team1_code', '')) else None
 
-            match = Match(
-                team1=row['team1'],
-                team2=row['team2'],
-                date=full_date,
-                stage="Group Stage",
-                group=group,
-                venue=row.get('venue', '')
-            )
-            db.session.add(match)
+                match = Match(
+                    team1=row['team1'],
+                    team2=row['team2'],
+                    date=full_date,
+                    stage="Group Stage",
+                    group=group,
+                    venue=row.get('venue', '')
+                )
+                db.session.add(match)
+                count += 1
+            except Exception as e:
+                print(f"Error seeding row: {e}")
 
         db.session.commit()
-        return f"✅ Successfully seeded {len(df)} matches from Excel!"
+        return f"✅ Successfully seeded {count} matches from Excel!"
 
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"❌ Error during seeding: {str(e)}"
 
 @bp.route('/db-check')
 def db_check():
