@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <h1 class="mb-4 text-white text-center">How to Play</h1>
+
+            <!-- Welcome -->
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <h4 class="text-warning">Welcome!</h4>
+                    <p class="lead text-white">This is a friendly betting pool for the 2026 World Cup. No real money or any forms of rewards would be given!</p>
+                </div>
+            </div>
+
+            <!-- Starting Points -->
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <h5 class="text-info">1. Starting Points</h5>
+                    <p class="text-white">Every player starts with <strong>1000 points</strong>.</p>
+                    <p class="text-white"><strong>Important:</strong> Your points <strong>cannot go below 0</strong>.</p>
+                </div>
+            </div>
+
+            <!-- How to Bet -->
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <h5 class="text-info">2. How to Place a Bet</h5>
+                    <ul class="text-white">
+                        <li>Go to the <strong>Home</strong> page</li>
+                        <li>Choose a match and enter your predicted score</li>
+                        <li>Enter how many points you want to bet (minimum <strong>50</strong>)</li>
+                        <li>Click <strong>Place Bet</strong> or <strong>Update Bet</strong></li>
+                        <li>You can change your bet anytime before the match starts</li>
+                    </ul>
+                </div>
+            </div>
+
+                        <!-- Points System -->
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <h5 class="text-info">3. How Points Are Calculated (Group Stage)</h5>
+                    
+                    <div class="alert alert-warning py-2 mb-3">
+                        <small><strong>Note:</strong> This points system currently applies to <strong>Group Stage</strong> only. 
+                        Knockout stage will have different (higher) multipliers.</small>
+                    </div>
+
+                    <table class="table table-dark table-bordered">
+                        <thead class="table-secondary text-dark">
+                            <tr>
+                                <th>Your Prediction</th>
+                                <th>Result</th>
+                                <th>Points Outcome</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-white">
+                            <tr>
+                                <td><strong>Exact Score</strong><br>(e.g. predict 2-1, result is 2-1)</td>
+                                <td class="text-success">Correct</td>
+                                <td><strong class="text-success">+ Stake</strong><br>(You get 2× your stake back)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Correct Winner</strong><br>(e.g. predict 2-1, result is 3-1)</td>
+                                <td class="text-success">Correct Winner</td>
+                                <td><strong class="text-success">+ 0.5 × Stake</strong><br>(You get 1.5× your stake back)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Wrong Prediction</strong></td>
+                                <td class="text-danger">Incorrect</td>
+                                <td><strong class="text-danger">- Stake</strong><br>(You lose the points you bet)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="text-white mt-3"><strong>Example:</strong> You bet 100 points on a Group Stage match.</p>
+                    <ul class="text-white">
+                        <li>Exact score correct → You get <strong>200 points</strong> back (+100 net)</li>
+                        <li>Correct winner but wrong score → You get <strong>150 points</strong> back (+50 net)</li>
+                        <li>Wrong → You lose <strong>100 points</strong></li>
+                    </ul>
+
+                    <div class="mt-3 p-3 bg-secondary rounded">
+                        <p class="mb-1 text-warning"><strong>Coming Soon: Knockout Stage</strong></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other Features -->
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-body">
+                    <h5 class="text-info">4. Other Features</h5>
+                    <ul class="text-white">
+                        <li><strong>My Bets</strong> — View and delete your active bets</li>
+                        <li><strong>Leaderboard</strong> — See who is winning (click any name to view their bets)</li>
+                        <li><strong>Profile</strong> — Update your nickname, birthday, zodiac, MBTI, etc.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <<div class="text-center mt-5">
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+
+                    <!-- Normal Button -->
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg px-5">
+                        Start Betting
+                    </a>
+
+                    <!-- Easter Egg Gold Button -->
+                    {% if not current_user.bonus_claimed %}
+                        <form method="POST" action="{{ url_for('main.claim_bonus') }}" style="display: inline;">
+                            <button type="submit" class="btn btn-warning btn-lg px-4" 
+                                    style="background-color: #FFD700; border-color: #FFD700; color: black; font-weight: bold;">
+                                Start Betting but in Gold ✨
+                            </button>
+                        </form>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!-- Confetti Effect for Bonus -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+{% if request.args.get('claimed') == 'true' %}
+<script>
+    // Trigger confetti when bonus is claimed
+    confetti({
+        particleCount: 200,
+        spread: 100,
+        origin: { y: 0.6 }
+    });
+
+    // Second burst
+    setTimeout(() => {
+        confetti({
+            particleCount: 150,
+            angle: 60,
+            spread: 80,
+            origin: { x: 0.1, y: 0.7 }
+        });
+    }, 300);
+
+    // Third burst
+    setTimeout(() => {
+        confetti({
+            particleCount: 150,
+            angle: 120,
+            spread: 80,
+            origin: { x: 0.9, y: 0.7 }
+        });
+    }, 600);
+</script>
+{% endif %}
+
+{% endblock %}

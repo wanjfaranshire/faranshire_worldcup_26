@@ -1,0 +1,464 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-4 fw-bold">⚽ FIFA World Cup 2026</h1>
+    <p class="lead text-light">Friends & Colleagues Betting Pool</p>
+</div>
+<style>
+    /* Try targeting the div directly */
+    #group-A, #group-B, #group-C, #group-D, #group-E, #group-F, 
+    #group-G, #group-H, #group-I, #group-J, #group-K, #group-L {
+        scroll-margin-top: 105px !important;
+    }
+</style>
+
+<!-- View Toggle -->
+<div class="d-flex justify-content-center mb-4">
+    <div class="btn-group" role="group">
+        <a href="?view=group" 
+        class="btn {{ 'btn-primary active' if not request.args.get('view') or request.args.get('view') == 'group' else 'btn-outline-primary' }}">
+        By Group
+    </a>
+    <a href="?view=time" 
+    class="btn {{ 'btn-primary active' if request.args.get('view') == 'time' else 'btn-outline-primary' }}">
+    By Date
+</a>
+</div>
+</div>
+
+<!-- ==================== GROUP VIEW ==================== -->
+{% if not request.args.get('view') or request.args.get('view') == 'group' %}
+
+<nav class="nav nav-pills mb-3 py-1 sticky-top flex-nowrap" 
+style="background: rgba(15, 23, 42, 0.7); 
+backdrop-filter: blur(12px); 
+z-index: 1020; 
+top: 56px;
+border-radius: 10pt;">
+<div class="container-fluid d-flex flex-nowrap">
+    {% for group in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+    <a class="nav-link mx-1 py-2 fw-bold text-center" 
+    href="#group-{{ group }}" 
+    style="font-size: 1.1rem; flex-grow: 1; white-space: nowrap;">
+    Group {{ group }}
+</a>
+{% endfor %}
+</div>
+</nav>
+
+<div class="container">
+    {% for group_letter in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+    <div id="group-{{ group_letter }}" class="mb-5">
+        <h2 class="border-bottom pb-2 mb-4 text-warning">GROUP {{ group_letter }}</h2>
+        
+        <div class="row row-cols-1 row-cols-lg-3 g-4">
+            {% for match in matches|selectattr('group', 'equalto', group_letter)|sort(attribute='date') %}
+            <div class="col">
+                <!-- Clickable Card -->
+                <div class="card bg-dark border-light h-100 shadow-lg hover-card d-flex flex-column match-card"
+                data-match-id="{{ match.id }}"
+                data-match-name="{{ match.team1 }} vs {{ match.team2 }}">
+
+                <div class="card-header text-white fw-bold py-2">
+                    {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+                </div>
+
+                <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+
+                    <!-- Teams -->
+                    <div class="row align-items-center text-center mb-4">
+                        <div class="col-5">
+                            <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team1) }}.png" 
+                            alt="{{ match.team1 }}" class="flag-img mb-2 rounded-circle">
+                            <h5 class="fw-bold mb-0">{{ match.team1 }}</h5>
+                        </div>
+                        <div class="col-2">
+                            <h1 class="text-warning mb-0 fw-bold neon-text" 
+                            style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                        </div>
+                        <div class="col-5">
+                            <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team2) }}.png" 
+                            alt="{{ match.team2 }}" class="flag-img mb-2 rounded-circle">
+                            <h5 class="fw-bold mb-0">{{ match.team2 }}</h5>
+                        </div>
+                    </div>
+
+                    {% if match.result %}
+<!-- FINISHED MATCH -->
+<div class="text-center mb-3">
+    <small class="text-info">
+        <i class="fas fa-users me-1"></i>
+        {{ match.bets|length }} bets placed
+    </small>
+</div>
+
+<!-- Final Result -->
+<div class="text-center mb-4">
+    <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+        {{ match.result }}
+    </h2>
+    <h6 class="text-warning mb-0" style="letter-spacing: 2px;">FINAL RESULT</h6>
+</div>
+
+<!-- Only show user's bet if they placed one -->
+{% set user_bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first if current_user.is_authenticated else None %}
+
+{% if user_bet %}
+    <div class="row g-2 justify-content-center align-items-center mb-4">
+        <div class="col-5">
+            <input type="number" class="form-control text-center bg-dark text-white fw-bold" 
+                   value="{{ user_bet.home_score }}" disabled style="font-size: 1.1rem;">
+        </div>
+        <div class="col-1 text-center">
+            <strong class="fs-4 text-warning">-</strong>
+        </div>
+        <div class="col-5">
+            <input type="number" class="form-control text-center bg-dark text-white fw-bold" 
+                   value="{{ user_bet.away_score }}" disabled style="font-size: 1.1rem;">
+        </div>
+    </div>
+{% endif %}
+
+<!-- No more "RACE FINISHED" button -->
+
+{% else %}
+<!-- ACTIVE -->
+{% if current_user.is_authenticated %}
+{% set bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first %}
+{% set match_started = match.date < now %}
+
+<!-- Bets Placed Indicator -->
+<div class="text-center mb-3">
+    <small class="text-info">
+        <i class="fas fa-users me-1"></i>
+        {{ match.bets|length }} bets placed
+    </small>
+</div>
+
+{% if match_started %}
+    <!-- Betting Closed -->
+    <div class="text-center">
+        <div class="alert alert-warning py-2 mb-2">
+            <strong>Betting Closed</strong><br>
+            <small>This match has already started.</small>
+        </div>
+        {% if bet %}
+            <div class="row g-2 justify-content-center align-items-center">
+                <div class="col-5">
+                    <input type="number" class="form-control text-center bg-dark text-white" 
+                           value="{{ bet.home_score }}" disabled>
+                </div>
+                <div class="col-1 text-center">
+                    <strong class="fs-4 text-warning">-</strong>
+                </div>
+                <div class="col-5">
+                    <input type="number" class="form-control text-center bg-dark text-white" 
+                           value="{{ bet.away_score }}" disabled>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <!-- Normal Betting Form -->
+    <form method="POST" action="{{ url_for('main.place_bet', match_id=match.id) }}" class="bet-form">
+        <div class="row g-2 justify-content-center align-items-center mb-3">
+            <div class="col-5">
+                <input type="number" name="home_score" class="form-control text-center" 
+                       value="{{ bet.home_score if bet else '' }}" min="0" required>
+            </div>
+            <div class="col-1 text-center">
+                <strong class="fs-4 text-warning">-</strong>
+            </div>
+            <div class="col-5">
+                <input type="number" name="away_score" class="form-control text-center" 
+                       value="{{ bet.away_score if bet else '' }}" min="0" required>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-light small">Stake (min 50 pts)</label>
+            <input type="number" name="stake" class="form-control text-center" 
+                   value="{{ bet.stake if bet else 50 }}" min="50" required>
+        </div>
+
+        <button type="submit" class="btn w-100 {{ 'btn-warning' if bet else 'btn-success' }}">
+            {{ 'Update Bet' if bet else 'Place Bet' }}
+        </button>
+    </form>
+{% endif %}
+
+{% else %}
+<a href="{{ url_for('main.login') }}" class="btn btn-outline-light w-100 mt-3">
+    Login to Place Bet
+</a>
+{% endif %}
+{% endif %}
+
+</div>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+{% endfor %}
+</div>
+
+{% endif %}
+
+<!-- ==================== BY DATE VIEW ==================== -->
+{% if request.args.get('view') == 'time' %}
+<div class="container">
+    {% for day, day_matches in matches_by_day.items() %}
+    <h3 class="text-warning border-bottom pb-2 mb-4 mt-5">
+        {{ day.strftime('%A, %d %B %Y') }}
+    </h3>
+    <div class="row row-cols-1 row-cols-lg-3 g-4">
+        {% for match in day_matches|sort(attribute='date') %}
+        <div class="col">
+            <div class="card bg-dark border-light h-100 shadow-lg hover-card d-flex flex-column match-card"
+            data-match-id="{{ match.id }}"
+            data-match-name="{{ match.team1 }} vs {{ match.team2 }}">
+
+            <div class="card-header text-white fw-bold py-2">
+                {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+            </div>
+
+            <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+
+                <!-- Teams -->
+                <div class="row align-items-center text-center mb-4">
+                    <div class="col-5">
+                        <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team1) }}.png" 
+                        alt="{{ match.team1 }}" class="flag-img mb-2 rounded-circle">
+                        <h5 class="fw-bold mb-0">{{ match.team1 }}</h5>
+                    </div>
+                    <div class="col-2">
+                        <h1 class="text-warning mb-0 fw-bold neon-text" 
+                        style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                    </div>
+                    <div class="col-5">
+                        <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team2) }}.png" 
+                        alt="{{ match.team2 }}" class="flag-img mb-2 rounded-circle">
+                        <h5 class="fw-bold mb-0">{{ match.team2 }}</h5>
+                    </div>
+                </div>
+
+                {% if match.result %}
+<!-- FINISHED MATCH -->
+<div class="text-center mb-3">
+    <small class="text-info">
+        <i class="fas fa-users me-1"></i>
+        {{ match.bets|length }} bets placed
+    </small>
+</div>
+
+<!-- Final Result -->
+<div class="text-center mb-4">
+    <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+        {{ match.result }}
+    </h2>
+    <h6 class="text-warning mb-0" style="letter-spacing: 2px;">FINAL RESULT</h6>
+</div>
+
+<!-- Only show user's bet if they placed one -->
+{% set user_bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first if current_user.is_authenticated else None %}
+
+{% if user_bet %}
+    <div class="row g-2 justify-content-center align-items-center mb-4">
+        <div class="col-5">
+            <input type="number" class="form-control text-center bg-dark text-white fw-bold" 
+                   value="{{ user_bet.home_score }}" disabled style="font-size: 1.1rem;">
+        </div>
+        <div class="col-1 text-center">
+            <strong class="fs-4 text-warning">-</strong>
+        </div>
+        <div class="col-5">
+            <input type="number" class="form-control text-center bg-dark text-white fw-bold" 
+                   value="{{ user_bet.away_score }}" disabled style="font-size: 1.1rem;">
+        </div>
+    </div>
+{% endif %}
+
+<!-- No more "RACE FINISHED" button -->
+
+{% else %}
+<!-- ACTIVE -->
+{% if current_user.is_authenticated %}
+{% set bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first %}
+{% set match_started = match.date < now %}
+
+<!-- Bets Placed Indicator -->
+<div class="text-center mb-3">
+    <small class="text-info">
+        <i class="fas fa-users me-1"></i>
+        {{ match.bets|length }} bets placed
+    </small>
+</div>
+
+{% if match_started %}
+    <!-- Betting Closed -->
+    <div class="text-center">
+        <div class="alert alert-warning py-2 mb-2">
+            <strong>Betting Closed</strong><br>
+            <small>This match has already started.</small>
+        </div>
+        {% if bet %}
+            <div class="row g-2 justify-content-center align-items-center">
+                <div class="col-5">
+                    <input type="number" class="form-control text-center bg-dark text-white" 
+                           value="{{ bet.home_score }}" disabled>
+                </div>
+                <div class="col-1 text-center">
+                    <strong class="fs-4 text-warning">-</strong>
+                </div>
+                <div class="col-5">
+                    <input type="number" class="form-control text-center bg-dark text-white" 
+                           value="{{ bet.away_score }}" disabled>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <!-- Normal Betting Form -->
+    <form method="POST" action="{{ url_for('main.place_bet', match_id=match.id) }}" class="bet-form">
+        <div class="row g-2 justify-content-center align-items-center mb-3">
+            <div class="col-5">
+                <input type="number" name="home_score" class="form-control text-center" 
+                       value="{{ bet.home_score if bet else '' }}" min="0" required>
+            </div>
+            <div class="col-1 text-center">
+                <strong class="fs-4 text-warning">-</strong>
+            </div>
+            <div class="col-5">
+                <input type="number" name="away_score" class="form-control text-center" 
+                       value="{{ bet.away_score if bet else '' }}" min="0" required>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-light small">Stake (min 50 pts)</label>
+            <input type="number" name="stake" class="form-control text-center" 
+                   value="{{ bet.stake if bet else 50 }}" min="50" required>
+        </div>
+
+        <button type="submit" class="btn w-100 {{ 'btn-warning' if bet else 'btn-success' }}">
+            {{ 'Update Bet' if bet else 'Place Bet' }}
+        </button>
+    </form>
+{% endif %}
+
+{% else %}
+<a href="{{ url_for('main.login') }}" class="btn btn-outline-light w-100 mt-3">
+    Login to Place Bet
+</a>
+{% endif %}
+{% endif %}
+
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+<!-- ==================== VIEW BETS MODAL ==================== -->
+<div class="modal fade" id="viewBetsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="modalMatchName"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="betsTableContainer"></div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = new bootstrap.Modal(document.getElementById('viewBetsModal'));
+
+    // Make whole card clickable (except forms and buttons)
+        document.querySelectorAll('.match-card').forEach(card => {
+            card.addEventListener('click', function(e) {
+            // Ignore clicks on form elements
+                if (e.target.closest('form') || e.target.closest('input') || e.target.closest('button') || e.target.closest('a')) {
+                    return;
+                }
+
+                const matchId = this.dataset.matchId;
+                const matchName = this.dataset.matchName;
+
+                document.getElementById('modalMatchName').textContent = matchName;
+
+                fetch(`/api/match_bets/${matchId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('betsTableContainer');
+                    container.innerHTML = '';
+
+                    if (data.bets.length === 0) {
+                        container.innerHTML = '<p class="text-muted">No bets placed yet.</p>';
+                    } else {
+                        let html = `
+                            <div class="table-responsive">
+                                <table class="table table-dark table-sm table-bordered align-middle">
+                                    <thead class="table-secondary text-dark">
+                                        <tr>
+                                            <th>Username</th>
+                                            <th class="text-center">Bet</th>
+                                            <th class="text-center">Stake</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+
+                        data.bets.forEach(bet => {
+                            html += `
+                                <tr>
+                                    <td><strong>${bet.username}</strong></td>
+                                    <td class="text-center"><strong class="text-info">${bet.home_score} - ${bet.away_score}</strong></td>
+                                    <td class="text-center">${bet.stake} pts</td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `</tbody></table></div>`;
+                        container.innerHTML = html;
+                    }
+
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error(error);
+                    alert('Failed to load bets.');
+                });
+            });
+        });
+
+    // Prevent form clicks from triggering card click
+        document.querySelectorAll('.bet-form').forEach(form => {
+            form.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+    });
+</script>
+
+<!-- Back to Top -->
+<a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+class="btn btn-primary rounded-circle shadow" 
+style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 2000; display: flex; align-items: center; justify-content: center;">
+<i class="fas fa-arrow-up fa-2x"></i>
+</a>
+
+{% endblock %}

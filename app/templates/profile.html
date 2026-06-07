@@ -1,0 +1,192 @@
+    {% extends 'base.html' %} {% block content %} <style>
+      input::placeholder,
+      textarea::placeholder {
+        color: #adb5bd !important;
+        /* Light gray, easy to see on dark bg */
+        opacity: 1;
+      }
+
+      select option {
+        color: white;
+        background-color: #1e2937;
+      }
+    </style>
+    <div class="container py-4">
+      <div class="row justify-content-center">
+        <div class="col-lg-7">
+          <h1 class="mb-4 text-white">My Profile</h1>
+          <!-- Profile Edit Form -->
+<div class="card bg-dark border-secondary shadow mb-5">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">Edit Profile</h5>
+    </div>
+    <div class="card-body">
+
+        <!-- START OF FORM -->
+        <form method="POST">
+
+            <!-- Nickname (Full Width) -->
+            <div class="mb-3">
+                <label class="form-label text-light fw-bold">Nickname</label>
+                <input type="text" name="nickname" class="form-control bg-dark text-white border-secondary"
+                       value="{{ current_user.nickname or '' }}">
+            </div>
+
+            <!-- Birthday + Zodiac Sign -->
+            <div class="row">
+                <!-- Birthday (Free Text) -->
+<div class="col-md-6 mb-3">
+    <label class="form-label text-light fw-bold">Birthday</label>
+    <input type="text" name="birthday" class="form-control bg-dark text-white border-secondary"
+           value="{{ current_user.birthday or '' }}"
+           placeholder="e.g. 1995-03-15 or 15 March 1995">
+</div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label text-light fw-bold">Zodiac Sign</label>
+                    <input type="text" name="zodiac_sign" class="form-control bg-dark text-white border-secondary"
+                           value="{{ current_user.zodiac_sign or '' }}" placeholder="giraffe">
+                </div>
+            </div>
+
+            <!-- MBTI + Blood Type -->
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label text-light fw-bold">MBTI</label>
+                    <input type="text" name="mbti" class="form-control bg-dark text-white border-secondary"
+                           value="{{ current_user.mbti or '' }}" placeholder="KAML">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label text-light fw-bold">Blood Type</label>
+                    <input type="text" name="blood_type" class="form-control bg-dark text-white border-secondary"
+                           value="{{ current_user.blood_type or '' }}" placeholder="K">
+                </div>
+            </div>
+
+            <!-- Favourite Team + Favourite Food -->
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label text-light fw-bold">Favourite Team</label>
+                    <select name="favourite_team" class="form-select bg-dark text-white border-secondary">
+                        <option value="">-- Select a team --</option>
+                        {% set teams = [
+                            'Algeria', 'Argentina', 'Australia', 'Austria', 'Belgium', 'Bosnia/Herzeg.', 
+            'Brazil', 'Canada', 'Cape Verde', 'Colombia', 'Croatia', 'Curaçao', 
+            'Czech Rep.', 'DR Congo', 'Ecuador', 'Egypt', 'England', 'France', 
+            'Germany', 'Ghana', 'Haiti', 'Iran', 'Iraq', 'Ivory Coast', 'Japan', 
+            'Jordan', 'Mexico', 'Morocco', 'Netherlands', 'New Zealand', 'Norway', 
+            'Panama', 'Paraguay', 'Portugal', 'Qatar', 'Rep. of Korea', 'Saudi Arabia', 
+            'Scotland', 'Senegal', 'South Africa', 'Spain', 'Sweden', 'Switzerland', 
+            'Tunisia', 'Turkey', 'Uruguay', 'USA', 'Uzbekistan'
+        ] %}
+                        ]|sort %}
+                        {% for team in teams %}
+                            <option value="{{ team }}" {% if current_user.favourite_team == team %}selected{% endif %}>
+                                {{ team }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <label class="form-label text-light fw-bold">Favourite Food</label>
+                    <input type="text" name="favourite_food" class="form-control bg-dark text-white border-secondary"
+                           value="{{ current_user.favourite_food or '' }}" placeholder="faranshire toast">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+
+        </form>
+        <!-- END OF FORM -->
+
+    </div>
+</div>
+          <!-- Betting History -->
+          <h3 class="mb-3 text-white">Betting History</h3> {% if history %}
+<div class="table-responsive">
+    <table class="table table-dark table-sm table-bordered align-middle">
+        <thead class="table-secondary text-dark">
+            <tr>
+                <th style="width: 70px;">Group</th>
+                <th>Match</th>
+                <th style="width: 110px;">Your Bet</th>
+                <th style="width: 130px;">Match Result</th>
+                <th style="width: 90px;">Outcome</th>
+                <th style="width: 100px;">Net</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bet in history %}
+            <tr>
+                <!-- Colored Group Badge -->
+                <td class="text-center">
+                    {% set group = bet.match.group %}
+                    {% if group == 'A' %}
+                        <span class="badge bg-primary">{{ group }}</span>
+                    {% elif group == 'B' %}
+                        <span class="badge bg-success">{{ group }}</span>
+                    {% elif group == 'C' %}
+                        <span class="badge bg-danger">{{ group }}</span>
+                    {% elif group == 'D' %}
+                        <span class="badge bg-warning text-dark">{{ group }}</span>
+                    {% elif group == 'E' %}
+                        <span class="badge bg-info text-dark">{{ group }}</span>
+                    {% elif group == 'F' %}
+                        <span class="badge bg-secondary">{{ group }}</span>
+                    {% elif group == 'G' %}
+                        <span class="badge bg-primary">{{ group }}</span>
+                    {% elif group == 'H' %}
+                        <span class="badge bg-success">{{ group }}</span>
+                    {% elif group == 'I' %}
+                        <span class="badge bg-danger">{{ group }}</span>
+                    {% elif group == 'J' %}
+                        <span class="badge bg-warning text-dark">{{ group }}</span>
+                    {% elif group == 'K' %}
+                        <span class="badge bg-info text-dark">{{ group }}</span>
+                    {% elif group == 'L' %}
+                        <span class="badge bg-secondary">{{ group }}</span>
+                    {% else %}
+                        <span class="badge bg-dark">{{ group }}</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <strong>{{ bet.match.team1 }}</strong> 
+                    <span class="text-warning mx-1">vs</span> 
+                    <strong>{{ bet.match.team2 }}</strong>
+                </td>
+
+                <td class="text-center">
+                    <strong class="text-info">{{ bet.home_score }} - {{ bet.away_score }}</strong>
+                </td>
+
+                <td class="text-center">
+                    <strong>{{ bet.match.result }}</strong>
+                </td>
+
+                <td class="text-center">
+                    {% if bet.points and bet.points > 0 %}
+                        <span class="badge bg-success">WIN</span>
+                    {% else %}
+                        <span class="badge bg-danger">LOSE</span>
+                    {% endif %}
+                </td>
+
+                <!-- Net Gain / Loss -->
+                <td class="text-center">
+                    {% if bet.points and bet.points > 0 %}
+                        <span class="text-success fw-bold">+{{ bet.points - bet.stake }}</span>
+                    {% else %}
+                        <span class="text-danger fw-bold">-{{ bet.stake }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+    <div class="alert alert-secondary">No completed bets yet.</div>
+{% endif %}
+        </div>
+      </div>
+    </div> {% endblock %}

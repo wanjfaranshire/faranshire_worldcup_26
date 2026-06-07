@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-4 fw-bold">🔧 Admin - Update Match Results</h1>
+    <p class="lead text-light">Enter real scores to calculate points</p>
+</div>
+<style>
+    /* Use the prefix that matches your HTML ID: admin-group- */
+    [id^="admin-group-"] {
+        scroll-margin-top: 105px !important;
+    }
+</style>
+
+<!-- View Toggle -->
+<div class="d-flex justify-content-center mb-4">
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('main.admin') }}" 
+           class="btn {{ 'btn-primary active' if not request.args.get('view') else 'btn-outline-primary' }}">
+            By Group
+        </a>
+        <a href="{{ url_for('main.admin') }}?view=time" 
+           class="btn {{ 'btn-primary active' if request.args.get('view') == 'time' else 'btn-outline-primary' }}">
+            By Date
+        </a>
+    </div>
+</div>
+
+<!-- Shorter Group Navigation Bar (Admin) -->
+{% if not request.args.get('view') %}
+<nav class="nav nav-pills mb-4 py-2 sticky-top flex-nowrap" 
+     style="background: rgba(15, 23, 42, 0.7); 
+            backdrop-filter: blur(12px); 
+            z-index: 1020; 
+            top: 56px; 
+            border-radius: 10pt;">
+    <div class="container-fluid d-flex flex-nowrap">
+        {% for group in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+            <a class="nav-link mx-1 py-1 fw-bold text-center" 
+               href="#admin-group-{{ group }}" 
+               style="font-size: 1rem; flex-grow: 1; white-space: nowrap;">
+               Group {{ group }}
+            </a>
+        {% endfor %}
+    </div>
+</nav>
+{% endif %}
+
+<div class="container">
+{% if not request.args.get('view') %}
+    {% for group_letter in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+        <div id="admin-group-{{ group_letter }}" class="mb-5">
+            <h2 class="border-bottom pb-2 mb-4 text-warning">GROUP {{ group_letter }}</h2>
+            
+            <div class="row row-cols-1 row-cols-lg-3 g-4">
+                {% for match in matches|selectattr('group', 'equalto', group_letter)|sort(attribute='date') %}
+                <div class="col">
+                    <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
+
+                        <div class="card-header text-white fw-bold py-2">
+                            {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+                        </div>
+
+                        <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+
+                            <!-- Teams -->
+                            <div class="row align-items-center text-center mb-4">
+                                <div class="col-5">
+                                    <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team1) }}.png" 
+                                         alt="{{ match.team1 }}" class="flag-img mb-2 rounded-circle">
+                                    <h5 class="fw-bold">{{ match.team1 }}</h5>
+                                </div>
+                                <div class="col-2">
+                                    <h1 class="text-warning mb-0 fw-bold neon-text" 
+                                        style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                                </div>
+                                <div class="col-5">
+                                    <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team2) }}.png" 
+                                         alt="{{ match.team2 }}" class="flag-img mb-2 rounded-circle">
+                                    <h5 class="fw-bold">{{ match.team2 }}</h5>
+                                </div>
+                            </div>
+
+                            {% if match.result %}
+                                <!-- Has Result -->
+                                <div class="text-center mb-4">
+                                    <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+                                        {{ match.result }}
+                                    </h2>
+                                    <h6 class="text-warning">FINAL RESULT</h6>
+                                </div>
+
+                                <form method="POST" action="{{ url_for('main.clear_result', match_id=match.id) }}">
+                                    <button type="submit" class="btn btn-warning w-100"
+                                            onclick="return confirm('Clear result and restore all points?')">
+                                        Clear Result & Restore Points
+                                    </button>
+                                </form>
+                            {% else %}
+                                <!-- No Result -->
+                                <form method="POST" action="{{ url_for('main.update_result', match_id=match.id) }}">
+                                    <div class="row g-2 justify-content-center align-items-center mb-3">
+                                        <div class="col-4">
+                                            <input type="number" name="home_score" class="form-control text-center" min="0" required>
+                                        </div>
+                                        <div class="col-2 text-center pt-2">
+                                            <strong class="fs-4 text-warning">-</strong>
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number" name="away_score" class="form-control text-center" min="0" required>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger w-100">Update Result</button>
+                                </form>
+                            {% endif %}
+
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <!-- By Date View -->
+    {% for day, day_matches in matches_by_day.items() %}
+        <h3 class="text-warning border-bottom pb-2 mb-4 mt-5">
+            {{ day.strftime('%A, %d %B %Y') }}
+        </h3>
+        <div class="row row-cols-1 row-cols-lg-3 g-4">
+            {% for match in day_matches|sort(attribute='date') %}
+            <div class="col">
+                <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
+
+                    <div class="card-header text-white fw-bold py-2">
+                        {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+                    </div>
+
+                    <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+
+                        <div class="row align-items-center text-center mb-4">
+                            <div class="col-5">
+                                <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team1) }}.png" 
+                                     alt="{{ match.team1 }}" class="flag-img mb-2 rounded-circle">
+                                <h5 class="fw-bold">{{ match.team1 }}</h5>
+                            </div>
+                            <div class="col-2">
+                                <h1 class="text-warning mb-0 fw-bold neon-text" 
+                                    style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                            </div>
+                            <div class="col-5">
+                                <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team2) }}.png" 
+                                     alt="{{ match.team2 }}" class="flag-img mb-2 rounded-circle">
+                                <h5 class="fw-bold">{{ match.team2 }}</h5>
+                            </div>
+                        </div>
+
+                        {% if match.result %}
+                            <div class="text-center mb-4">
+                                <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+                                    {{ match.result }}
+                                </h2>
+                                <h6 class="text-warning">FINAL RESULT</h6>
+                            </div>
+
+                            <form method="POST" action="{{ url_for('main.clear_result', match_id=match.id) }}">
+                                <button type="submit" class="btn btn-warning w-100"
+                                        onclick="return confirm('Clear result and restore all points?')">
+                                    Clear Result & Restore Points
+                                </button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('main.update_result', match_id=match.id) }}">
+                                <div class="row g-2 justify-content-center align-items-center mb-3">
+                                    <div class="col-4">
+                                        <input type="number" name="home_score" class="form-control text-center" min="0" required>
+                                    </div>
+                                    <div class="col-2 text-center pt-2">
+                                        <strong class="fs-4 text-warning">-</strong>
+                                    </div>
+                                    <div class="col-4">
+                                        <input type="number" name="away_score" class="form-control text-center" min="0" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-danger w-100">Update Result</button>
+                            </form>
+                        {% endif %}
+
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+{% endif %}
+</div>
+
+<!-- Back to Top -->
+<a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+   class="btn btn-primary rounded-circle shadow" 
+   style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 2000; display: flex; align-items: center; justify-content: center;">
+    <i class="fas fa-arrow-up fa-2x"></i>
+</a>
+
+{% endblock %}

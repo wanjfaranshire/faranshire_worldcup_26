@@ -1,0 +1,278 @@
+    {% extends 'base.html' %}
+
+    {% block content %}
+    <div class="text-center mb-4">
+        <h1 class="display-4 fw-bold">My Bets</h1>
+        <h3 class="text-success">Current Points: <strong>{{ total_points }}</strong></h3>
+    </div>
+<style>
+    /* Target the 'my-group-' prefix used in this file */
+    [id^="my-group-"] {
+        scroll-margin-top: 105px !important;
+    }
+</style>
+
+    <!-- View Toggle -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('main.my_bets') }}" 
+               class="btn {{ 'btn-primary active' if not request.args.get('view') else 'btn-outline-primary' }}">
+                By Group
+            </a>
+            <a href="{{ url_for('main.my_bets') }}?view=time" 
+               class="btn {{ 'btn-primary active' if request.args.get('view') == 'time' else 'btn-outline-primary' }}">
+                By Date
+            </a>
+        </div>
+    </div>
+
+    <!-- Your Nav Bar Style -->
+    {% if not request.args.get('view') %}
+    <nav class="nav nav-pills mb-3 py-1 sticky-top flex-nowrap" 
+         style="background: rgba(15, 23, 42, 0.7); 
+                backdrop-filter: blur(12px); 
+                z-index: 1020; 
+                top: 56px; 
+                border-radius: 10pt;">
+        <div class="container-fluid d-flex flex-nowrap">
+            {% for group in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+                <a class="nav-link mx-1 py-2 fw-bold text-center" 
+                   href="#my-group-{{ group }}" 
+                   style="font-size: 1.1rem; flex-grow: 1; white-space: nowrap;">
+                   Group {{ group }}
+                </a>
+            {% endfor %}
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="container pb-5">
+    {% if not request.args.get('view') %}
+        {% for group_letter in ['A','B','C','D','E','F','G','H','I','J','K','L'] %}
+            {% set group_bets = bets|selectattr('match.group', 'equalto', group_letter)|list %}
+            {% if group_bets %}
+                <div id="my-group-{{ group_letter }}" class="mb-5">
+                    <h2 class="border-bottom pb-2 mb-4 text-warning">GROUP {{ group_letter }}</h2>
+                    
+                    <div class="row row-cols-1 row-cols-lg-3 g-4">
+                        {% for bet in group_bets|sort(attribute='match.date') %}
+                        <div class="col">
+                            <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
+
+                                <div class="card-header text-white fw-bold py-2">
+                                {{ bet.match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ bet.match.venue or 'TBD' }}
+                            </div>
+
+                            <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+
+                                <!-- Teams (same as home page) -->
+                                <div class="row align-items-center text-center mb-4">
+                                    <div class="col-5">
+                                        <img src="https://flagcdn.com/w40/{{ get_flag_code(bet.match.team1) }}.png" 
+                                             alt="{{ bet.match.team1 }}" class="flag-img mb-2 rounded-circle">
+                                        <h5 class="fw-bold mb-0">{{ bet.match.team1 }}</h5>
+                                    </div>
+                                    <div class="col-2">
+                                        <h1 class="text-warning mb-0 fw-bold neon-text" 
+                                            style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                                    </div>
+                                    <div class="col-5">
+                                        <img src="https://flagcdn.com/w40/{{ get_flag_code(bet.match.team2) }}.png" 
+                                             alt="{{ bet.match.team2 }}" class="flag-img mb-2 rounded-circle">
+                                        <h5 class="fw-bold mb-0">{{ bet.match.team2 }}</h5>
+                                    </div>
+                                </div>
+
+                                {% if bet.match.result %}
+                                    <!-- Finished Match -->
+                                    <div class="text-center mb-4">
+                                        <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+                                            {{ bet.match.result }}
+                                        </h2>
+                                        <h6 class="text-warning">FINAL RESULT</h6>
+                                    </div>
+
+                                    <div class="row g-2 justify-content-center align-items-center mb-4">
+                                        <div class="col-5">
+                                            <input type="number" class="form-control text-center bg-dark text-white" 
+                                                   value="{{ bet.home_score }}" disabled>
+                                        </div>
+                                        <div class="col-1 text-center">
+                                            <strong class="fs-4 text-warning">-</strong>
+                                        </div>
+                                        <div class="col-5">
+                                            <input type="number" class="form-control text-center bg-dark text-white" 
+                                                   value="{{ bet.away_score }}" disabled>
+                                        </div>
+                                    </div>
+
+                                    {% if bet.points and bet.points > 0 %}
+                                        <button class="btn btn-success w-100" disabled>
+                                            Congratulations! (Net +{{ bet.points - bet.stake }})
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-danger w-100" disabled>
+                                            Opps... (Net -{{ bet.stake }})
+                                        </button>
+                                    {% endif %}
+
+                                {% else %}
+    <!-- Active Bet -->
+    {% set match_started = bet.match.date < now %}
+
+    <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) }}">
+        <div class="row g-2 justify-content-center align-items-center mb-3">
+            <div class="col-5">
+                <input type="number" name="home_score" class="form-control text-center" 
+                       value="{{ bet.home_score }}" min="0" required disabled>
+            </div>
+            <div class="col-1 text-center">
+                <strong class="fs-4 text-warning">-</strong>
+            </div>
+            <div class="col-5">
+                <input type="number" name="away_score" class="form-control text-center" 
+                       value="{{ bet.away_score }}" min="0" required disabled>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-light small">Stake (min 50 pts)</label>
+            <input type="number" name="stake" class="form-control text-center" 
+                   value="{{ bet.stake }}" min="50" required disabled>
+        </div>
+    </form>
+
+    {% if match_started %}
+        <!-- Match has started - cannot delete -->
+        <div class="alert alert-warning py-2 mb-0 text-center">
+            <small><strong>Match has started</strong><br>Cannot delete bet anymore.</small>
+        </div>
+    {% else %}
+        <!-- Can still delete -->
+        <form method="POST" action="{{ url_for('main.delete_bet', bet_id=bet.id) }}">
+            <button type="submit" class="btn btn-outline-danger w-100"
+                    onclick="return confirm('Delete this bet and refund stake?')">
+                Delete Bet (Refund Stake)
+            </button>
+        </form>
+    {% endif %}
+{% endif %}
+
+                            </div>
+                        </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% else %}
+    <!-- ==================== By Date View ==================== -->
+    <div class="container pb-5">
+    {% for day, day_matches in my_bets_by_day.items() %}
+    
+    <div class="mb-5">
+        <h3 class="text-warning border-bottom pb-2 mb-4 mt-5">
+            {{ day.strftime('%A, %d %B %Y') }}
+        </h3>
+        
+        <div class="row row-cols-1 row-cols-lg-3 g-4">
+            {% for bet in day_matches|sort(attribute='match.date') %}
+            <div class="col">
+                <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
+
+                    <div class="card-header text-white fw-bold py-2">
+                        {{ bet.match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ bet.match.venue or 'TBD' }}
+                    </div>
+
+                    <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+                        <div class="row align-items-center text-center mb-4">
+                            <div class="col-5">
+                                <img src="https://flagcdn.com/w40/{{ get_flag_code(bet.match.team1) }}.png" 
+                                     alt="{{ bet.match.team1 }}" class="flag-img mb-2 rounded-circle">
+                                <h5 class="fw-bold mb-0">{{ bet.match.team1 }}</h5>
+                            </div>
+                            <div class="col-2">
+                                <h1 class="text-warning mb-0 fw-bold neon-text" 
+                                    style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+                            </div>
+                            <div class="col-5">
+                                <img src="https://flagcdn.com/w40/{{ get_flag_code(bet.match.team2) }}.png" 
+                                     alt="{{ bet.match.team2 }}" class="flag-img mb-2 rounded-circle">
+                                <h5 class="fw-bold mb-0">{{ bet.match.team2 }}</h5>
+                            </div>
+                        </div>
+
+                        {% if bet.match.result %}
+                            <div class="text-center mb-4">
+                                <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
+                                    {{ bet.match.result }}
+                                </h2>
+                                <h6 class="text-warning">FINAL RESULT</h6>
+                            </div>
+
+                            <div class="row g-2 justify-content-center align-items-center mb-4">
+                                <div class="col-5">
+                                    <input type="number" class="form-control text-center bg-dark text-white" value="{{ bet.home_score }}" disabled>
+                                </div>
+                                <div class="col-1 text-center"><strong class="fs-4 text-warning">-</strong></div>
+                                <div class="col-5">
+                                    <input type="number" class="form-control text-center bg-dark text-white" value="{{ bet.away_score }}" disabled>
+                                </div>
+                            </div>
+
+                            {% if bet.points and bet.points > 0 %}
+                                <button class="btn btn-success w-100" disabled>Congratulations! (Net +{{ bet.points - bet.stake }})</button>
+                            {% else %}
+                                <button class="btn btn-danger w-100" disabled>Opps... (Net -{{ bet.stake }})</button>
+                            {% endif %}
+                        {% else %}
+                            <!-- Active Bet -->
+    <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) }}">
+        <div class="row g-2 justify-content-center align-items-center mb-3">
+            <div class="col-5">
+                <input type="number" name="home_score" class="form-control text-center" 
+                       value="{{ bet.home_score }}" min="0" required **disabled**>
+            </div>
+            <div class="col-1 text-center">
+                <strong class="fs-4 text-warning">-</strong>
+            </div>
+            <div class="col-5">
+                <input type="number" name="away_score" class="form-control text-center" 
+                       value="{{ bet.away_score }}" min="0" required **disabled**>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-light small">Stake (min 50 pts)</label>
+            <input type="number" name="stake" class="form-control text-center" 
+                   value="{{ bet.stake }}" min="50" required **disabled**>
+        </div>
+    </form>
+
+    <form method="POST" action="{{ url_for('main.delete_bet', bet_id=bet.id) }}">
+        <button type="submit" class="btn btn-outline-danger w-100"
+                onclick="return confirm('Delete this bet and refund stake?')">
+            Delete Bet (Refund Stake)
+        </button>
+    </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+    </div>
+
+    <!-- Back to Top -->
+    <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+       class="btn btn-primary rounded-circle shadow" 
+       style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 2000; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-arrow-up fa-2x"></i>
+    </a>
+
+    {% endblock %}

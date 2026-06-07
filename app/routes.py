@@ -1,0 +1,507 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from app import db
+from app.models import User, Match, Bet
+from app.forms import RegistrationForm, LoginForm
+from datetime import datetime
+from flask import jsonify
+from sqlalchemy.orm import joinedload
+
+bp = Blueprint("main", __name__)
+
+# ====================== HOME ======================
+@bp.route("/")
+def index():
+    matches = Match.query.order_by(Match.date).all()
+
+    # Prepare data for "By Date" view
+    from collections import defaultdict
+    from datetime import datetime
+
+    matches_by_day = defaultdict(list)
+    for match in matches:
+        day = match.date.date()  # Group by date only
+        matches_by_day[day].append(match)
+        
+    return render_template("index.html", matches=matches, matches_by_day=matches_by_day, now=datetime.now())
+
+
+# ====================== AUTH ======================
+@bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Check if passwords match
+        if password != confirm_password:
+            flash('Passwords do not match.', 'warning')
+            return redirect(url_for('main.register'))
+
+        # ✅ Prevent duplicate username
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists. Please choose another one.', 'warning')
+            return redirect(url_for('main.register'))
+
+        # Create new user
+        new_user = User(
+            username=username,
+            password_hash=generate_password_hash(password),
+            points=1000
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash('Account created successfully! Please login.', 'success')
+        return redirect(url_for('main.login'))
+
+    return render_template('register.html')
+
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+
+            # === NEW: Redirect to Profile if first time ===
+            if not user.nickname:   # If nickname is empty, assume first login
+                flash('Welcome! Please complete your profile.', 'info')
+                return redirect(url_for('main.profile'))
+
+            return redirect(url_for('main.index'))
+        else:
+            flash('Invalid username or password.', 'danger')
+
+    return render_template('login.html')
+
+
+@bp.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("main.index"))
+
+
+# ====================== BETTING ======================
+@bp.route("/place_bet/<int:match_id>", methods=["POST"])
+@login_required
+def place_bet(match_id):
+    from datetime import datetime
+
+    match = Match.query.get_or_404(match_id)
+
+    # Block if result already entered
+    if match.result:
+        flash("This match has already finished.", "danger")
+        return redirect(url_for("main.index"))
+
+    # Block if match time has already passed
+    if match.date < datetime.now():
+        flash("This match has already started. You can no longer place or update bets.", "danger")
+        return redirect(url_for("main.index"))
+
+    home_score = request.form.get("home_score", type=int)
+    away_score = request.form.get("away_score", type=int)
+    new_stake = request.form.get("stake", type=int, default=50)
+
+    if new_stake < 50:
+        flash("Minimum stake is 50 points.", "danger")
+        return redirect(url_for("main.index"))
+
+    existing_bet = Bet.query.filter_by(
+        user_id=current_user.id, match_id=match_id
+    ).first()
+
+    if existing_bet:
+        # ====================== UPDATING EXISTING BET ======================
+        old_stake = existing_bet.stake or 0
+        difference = new_stake - old_stake
+
+        if difference > 0:
+            # Increasing stake
+            if current_user.current_points < difference:
+                flash("Not enough points to increase your bet!", "danger")
+                return redirect(url_for("main.index"))
+            current_user.points -= difference
+        else:
+            # Decreasing stake → refund the difference
+            current_user.points += abs(difference)
+
+        existing_bet.home_score = home_score
+        existing_bet.away_score = away_score
+        existing_bet.stake = new_stake
+        existing_bet.points = 0
+
+    else:
+        # ====================== NEW BET ======================
+        if current_user.current_points < new_stake:
+            flash("Not enough points!", "danger")
+            return redirect(url_for("main.index"))
+
+        current_user.points -= new_stake
+
+        bet = Bet(
+            user_id=current_user.id,
+            match_id=match_id,
+            home_score=home_score,
+            away_score=away_score,
+            stake=new_stake,
+            points=0,
+        )
+        db.session.add(bet)
+
+    db.session.commit()
+    flash("Bet placed / updated successfully!", "success")
+    return redirect(url_for("main.index"))
+
+
+@bp.route("/my_bets")
+@login_required
+def my_bets():
+    from datetime import datetime
+    from collections import defaultdict
+
+    user_bets = Bet.query.filter_by(user_id=current_user.id).all()
+
+    my_bets_by_day = defaultdict(list)
+    for bet in user_bets:
+        day = bet.match.date.date()
+        my_bets_by_day[day].append(bet)
+
+    return render_template(
+        "my_bets.html",
+        bets=user_bets,
+        total_points=current_user.current_points,
+        my_bets_by_day=my_bets_by_day,
+        now=datetime.now()           # ← Add this
+    )
+
+
+@bp.route("/leaderboard")
+def leaderboard():
+    users = User.query.all()
+
+    # Sort by dynamic current_points (most accurate)
+    users = sorted(users, key=lambda u: u.current_points, reverse=True)
+
+    return render_template("leaderboard.html", users=users)
+
+
+@bp.route("/delete_bet/<int:bet_id>", methods=["POST"])
+@login_required
+def delete_bet(bet_id):
+    bet = Bet.query.get_or_404(bet_id)
+
+    if bet.user_id != current_user.id:
+        flash("You can only delete your own bets.", "danger")
+        return redirect(url_for("main.my_bets"))
+
+    if bet.match.result:
+        flash("Cannot delete bet on a finished match.", "danger")
+        return redirect(url_for("main.my_bets"))
+
+    # Refund the stake
+    current_user.points += bet.stake or 50
+
+    db.session.delete(bet)
+    db.session.commit()
+
+    flash("Bet deleted and stake refunded successfully.", "success")
+    return redirect(url_for("main.my_bets"))
+
+
+# ====================== HELPER: Get User's Bet for a Match (for index) ======================
+# (Optional improvement)
+@bp.app_template_filter("user_bet")
+def get_user_bet(match, user):
+    bet = next((b for b in match.bets if b.user_id == user.id), None)
+    return bet.prediction if bet else None
+
+
+# ====================== TEMPLATE HELPERS ======================
+@bp.app_template_global("get_flag_code")
+def get_flag_code(team_name):
+    """Return country code for flagcdn.com"""
+    flag_map = {
+        "Mexico": "mx",
+        "South Africa": "za",
+        "Rep. of Korea": "kr",
+        "Czech Rep.": "cz",
+        "Canada": "ca",
+        "Bosn. & Herz.": "ba",
+        "USA": "us",
+        "Paraguay": "py",
+        "Brazil": "br",
+        "Morocco": "ma",
+        "Qatar": "qa",
+        "Switzerland": "ch",
+        "Haiti": "ht",
+        "Scotland": "gb-sct",
+        "Australia": "au",
+        "Turkey": "tr",
+        "Germany": "de",
+        "Curaçao": "cw",
+        "Netherlands": "nl",
+        "Japan": "jp",
+        "Ivory Coast": "ci",
+        "Ecuador": "ec",
+        "Sweden": "se",
+        "Tunisia": "tn",
+        "Spain": "es",
+        "Cape Verde": "cv",
+        "Belgium": "be",
+        "Egypt": "eg",
+        "Saudi Arabia": "sa",
+        "Uruguay": "uy",
+        "IR Iran": "ir",
+        "New Zealand": "nz",
+        "France": "fr",
+        "Senegal": "sn",
+        "Iraq": "iq",
+        "Norway": "no",
+        "Argentina": "ar",
+        "Algeria": "dz",
+        "Austria": "at",
+        "Jordan": "jo",
+        "Portugal": "pt",
+        "DR Congo": "cd",
+        "England": "gb-eng",
+        "Croatia": "hr",
+        "Ghana": "gh",
+        "Panama": "pa",
+        "Uzbekistan": "uz",
+        "Colombia": "co",
+        # Add more if needed
+    }
+    return flag_map.get(team_name, "xx")
+
+
+# ====================== ADMIN - ENTER RESULTS ======================
+@bp.route("/admin", methods=["GET", "POST"])
+@login_required
+def admin():
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for("main.index"))
+
+    matches = Match.query.order_by(Match.date).all()
+
+    from collections import defaultdict
+    matches_by_day = defaultdict(list)
+    for match in matches:
+        day = match.date.date()
+        matches_by_day[day].append(match)
+
+    return render_template("admin.html", matches=matches, matches_by_day=matches_by_day)
+
+@bp.route("/update_result/<int:match_id>", methods=["POST"])
+@login_required
+def update_result(match_id):
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for("main.admin"))
+
+    match = Match.query.get_or_404(match_id)
+    home = request.form.get("home_score", type=int)
+    away = request.form.get("away_score", type=int)
+
+    if home is None or away is None:
+        flash("Invalid scores entered.", "danger")
+        return redirect(url_for("main.admin"))
+
+    match.result = f"{home} - {away}"
+
+    # Calculate points using the method in Bet model (supports 2x and 1.5x)
+    for bet in match.bets:
+        bet.points = bet.calculate_points(home, away)
+
+    db.session.commit()
+    flash(f"Result updated for {match.team1} vs {match.team2}. Points awarded.", "success")
+    return redirect(url_for("main.admin"))
+
+@bp.route("/admin/delete_bet/<int:bet_id>", methods=["POST"])
+@login_required
+def admin_delete_bet(bet_id):
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for("main.admin"))
+
+    bet = Bet.query.get_or_404(bet_id)
+    user = bet.user
+
+    # Refund the stake if the bet was active (no result yet)
+    if not bet.match.result:
+        user.points += bet.stake or 50
+
+    db.session.delete(bet)
+    db.session.commit()
+
+    flash(f"Deleted bet for {bet.match.team1} vs {bet.match.team2}", "info")
+    return redirect(url_for("main.admin"))
+
+@bp.route("/clear_result/<int:match_id>", methods=["POST"])
+def clear_result(match_id):
+    if not current_user.is_authenticated:
+        flash("Please login", "danger")
+        return redirect(url_for("main.login"))
+
+    match = Match.query.get_or_404(match_id)
+
+    # Reset earned points but KEEP the bet record
+    bets = Bet.query.filter_by(match_id=match_id).all()
+    for bet in bets:
+        bet.points = 0  # Remove the gain/loss
+
+    match.result = None
+    db.session.commit()
+
+    flash(
+        f"Result cleared for {match.team1} vs {match.team2}. Points restored.",
+        "success",
+    )
+    return redirect(url_for("main.admin"))
+
+
+# ==================== PROFILE ====================
+@bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        current_user.nickname = request.form.get('nickname', '').strip()
+        
+        # Birthday
+        current_user.birthday = request.form.get('birthday', '').strip()
+        current_user.zodiac_sign = request.form.get('zodiac_sign', '').strip()
+        current_user.blood_type = request.form.get('blood_type', '').strip()
+        current_user.mbti = request.form.get('mbti', '').strip()
+        current_user.favourite_team = request.form.get('favourite_team', '').strip()
+        current_user.favourite_food = request.form.get('favourite_food', '').strip()
+
+        db.session.commit()
+        db.session.refresh(current_user)
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('main.profile'))
+
+    history = (
+        Bet.query
+        .options(joinedload(Bet.match))
+        .filter(Bet.user_id == current_user.id)
+        .join(Match)
+        .filter(Match.result.isnot(None))
+        .order_by(Match.group.asc(), Match.date.asc())
+        .all()
+    )
+
+    return render_template('profile.html', history=history)
+
+
+# ==================== USER PROFILE API (for modal) ====================
+@bp.route('/api/user_profile/<int:user_id>')
+@login_required
+def user_profile_api(user_id):
+    user = User.query.get_or_404(user_id)
+
+    # ✅ Correctly filter bets by this specific user
+    bets = (
+        Bet.query
+        .options(joinedload(Bet.match))
+        .filter_by(user_id=user.id)                    # ← Important
+        .join(Match)
+        .filter(Match.result.isnot(None))
+        .order_by(Match.group.asc(), Match.date.asc())
+        .all()
+    )
+
+    history = []
+    wins = 0
+    losses = 0
+
+    for bet in bets:
+        if bet.points and bet.points > 0:
+            wins += 1
+            outcome = "WIN"
+        else:
+            losses += 1
+            outcome = "LOSE"
+
+        history.append({
+            "group": bet.match.group,
+            "match": f"{bet.match.team1} vs {bet.match.team2}",
+            "your_bet": f"{bet.home_score} - {bet.away_score}",
+            "match_result": bet.match.result,
+            "outcome": outcome
+        })
+
+    data = {
+        "username": user.username,
+        "nickname": user.nickname,
+        "birthday": user.birthday if user.birthday else None,
+        "zodiac_sign": user.zodiac_sign,
+        "blood_type": user.blood_type,
+        "mbti": user.mbti,
+        "favourite_team": user.favourite_team,
+        "favourite_food": user.favourite_food,
+        "total_points": user.current_points,
+        "wins": wins,
+        "losses": losses,
+        "history": history
+    }
+    return jsonify(data)
+
+@bp.route('/api/match_bets/<int:match_id>')
+@login_required
+def match_bets_api(match_id):
+    match = Match.query.get_or_404(match_id)
+    
+    bets = Bet.query.filter_by(match_id=match_id).all()
+    
+    bet_list = []
+    for bet in bets:
+        bet_list.append({
+            "username": bet.user.username,
+            "home_score": bet.home_score,
+            "away_score": bet.away_score,
+            "stake": bet.stake,
+            "points": bet.points if match.result else None
+        })
+    
+    return jsonify({
+        "match": f"{match.team1} vs {match.team2}",
+        "total_bets": len(bet_list),
+        "bets": bet_list
+    })
+
+@bp.route('/how-to-play')
+def how_to_play():
+    return render_template('how_to_play.html')
+
+@bp.route('/make-admin')
+@login_required
+def make_admin():
+    # Option 1: Make the currently logged-in user an admin
+    current_user.is_admin = True
+    db.session.commit()
+    
+    flash(f"You are now an admin! ({current_user.username})", "success")
+    return redirect(url_for('main.admin'))
+
+@bp.route('/claim-bonus', methods=['POST'])
+@login_required
+def claim_bonus():
+    if current_user.bonus_claimed:
+        flash("You have already claimed the bonus!", "warning")
+        return redirect(url_for('main.how_to_play'))
+
+    current_user.points += 1000
+    current_user.bonus_claimed = True
+    db.session.commit()
+
+    # Redirect with query param to trigger confetti
+    return redirect(url_for('main.how_to_play', claimed='true'))
