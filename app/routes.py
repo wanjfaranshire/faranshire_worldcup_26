@@ -542,3 +542,25 @@ def seed_database():
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+@bp.route('/db-check')
+def db_check():
+    try:
+        from app.models import Match, User, Bet
+        import sqlalchemy as sa
+
+        match_count = Match.query.count()
+        user_count = User.query.count()
+        bet_count = Bet.query.count()
+
+        return f"""
+        <h2>Database Check</h2>
+        <p>✅ Tables exist!</p>
+        <ul>
+            <li>Matches: {match_count}</li>
+            <li>Users: {user_count}</li>
+            <li>Bets: {bet_count}</li>
+        </ul>
+        """
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
