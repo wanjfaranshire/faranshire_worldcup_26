@@ -1,2 +1,8 @@
-"instance/" 
-"*.db" 
+__pycache__/
+*.pyc
+venv/
+env/
+instance/
+*.db
+.DS_Store
+__MACOSX/
