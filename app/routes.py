@@ -513,13 +513,12 @@ def seed_database():
         import pandas as pd
         from datetime import datetime
 
-        # Force create all tables
         db.create_all()
 
-        # Clear existing data
         Match.query.delete()
         db.session.commit()
 
+        # Try to load the Excel file
         df = pd.read_excel('group_schedule.xlsx')
 
         count = 0
@@ -541,14 +540,14 @@ def seed_database():
                 )
                 db.session.add(match)
                 count += 1
-            except Exception as e:
-                print(f"Error seeding row: {e}")
+            except Exception as inner_e:
+                print(f"Skipped row: {inner_e}")
 
         db.session.commit()
         return f"✅ Successfully seeded {count} matches from Excel!"
 
     except Exception as e:
-        return f"❌ Error during seeding: {str(e)}"
+        return f"❌ Seeding Error: {str(e)}"
 
 @bp.route('/db-check')
 def db_check():
