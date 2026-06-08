@@ -582,3 +582,12 @@ def claim_bread_bonus():
     db.session.commit()
 
     return "🍞 Secret Faranshire Bonus claimed! +500 points added to your account!"
+
+@bp.route('/db-migrate')
+def db_migrate():
+    db.create_all()
+    return """
+        <h2>✅ Database Migration Successful!</h2>
+        <p>New columns have been added.</p>
+        <p><a href="/">Go back to Home</a></p>
+    """
