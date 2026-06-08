@@ -591,3 +591,27 @@ def db_migrate():
         <p>New columns have been added.</p>
         <p><a href="/">Go back to Home</a></p>
     """
+
+@bp.route('/claim-pancake-bonus', methods=['POST'])
+@login_required
+def claim_pancake_bonus():
+    if getattr(current_user, 'pancake_bonus_claimed', False):
+        return "You've already claimed this bonus!"
+
+    current_user.points += 200
+    current_user.pancake_bonus_claimed = True
+    db.session.commit()
+
+    return "🥞 Secret Pancake Bonus claimed! +200 points added!"
+
+@bp.route('/claim-lomo-bonus', methods=['POST'])
+@login_required
+def claim_lomo_bonus():
+    if getattr(current_user, 'lomo_bonus_claimed', False):
+        return "You've already claimed this bonus!"
+
+    current_user.points += 300
+    current_user.lomo_bonus_claimed = True
+    db.session.commit()
+
+    return "🤱 Secret lomo Bonus claimed! +300 points added!"
