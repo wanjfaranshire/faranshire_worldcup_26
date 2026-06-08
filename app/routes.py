@@ -570,3 +570,15 @@ def db_check():
         """
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+@bp.route('/claim-bread-bonus', methods=['POST'])
+@login_required
+def claim_bread_bonus():
+    if getattr(current_user, 'bread_bonus_claimed', False):
+        return "You've already claimed the secret faranshire! 🍞"
+
+    current_user.points += 500
+    current_user.bread_bonus_claimed = True
+    db.session.commit()
+
+    return "🍞 Secret Faranshire Bonus claimed! +500 points added to your account!"

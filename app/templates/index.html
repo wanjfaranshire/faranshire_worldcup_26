@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="text-center mb-5">
-    <h1 class="display-4 fw-bold">⚽ FIFA World Cup 2026</h1>
+    <h1 class="display-4 fw-bold">🍞🥞 Faranshire Cup 2026</h1>
     <p class="lead text-light">Friends & Colleagues Betting Pool</p>
 </div>
 <style>
@@ -11,6 +11,26 @@
     #group-G, #group-H, #group-I, #group-J, #group-K, #group-L {
         scroll-margin-top: 105px !important;
     }
+#secret-bread {
+    position: absolute;
+    top: 75%;
+    left: 8%;
+    width: 100px;
+    height: 100px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    font-size: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: auto;
+    user-select: none;
+}
+
+#secret-bread:hover {
+    opacity: 1;
+}
 </style>
 
 <!-- View Toggle -->
@@ -381,6 +401,41 @@ border-radius: 10pt;">
         </div>
     </div>
 </div>
+
+<!-- Hidden Bread Easter Egg -->
+{% if current_user.is_authenticated and not current_user.bread_bonus_claimed %}
+<div id="secret-bread">🍞</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bread = document.getElementById('secret-bread');
+
+    bread.addEventListener('mouseenter', function() {
+        bread.style.opacity = '1';
+        bread.style.cursor = '🍞';
+    });
+
+    bread.addEventListener('mouseleave', function() {
+        bread.style.opacity = '0';
+    });
+
+    bread.addEventListener('click', function() {
+        fetch('/claim-bread-bonus', { method: 'POST' })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+                // Auto refresh the page to show updated points
+                setTimeout(() => {
+                    window.location.reload();
+                }, 800);   // Small delay so user can read the alert
+            })
+            .catch(() => {
+                alert("Something went wrong with the bread bonus!");
+            });
+    });
+});
+</script>
+{% endif %}
 
 <!-- JavaScript -->
 <script>

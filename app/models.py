@@ -25,6 +25,7 @@ class User(UserMixin, db.Model):
     favourite_team = db.Column(db.String(80))
     favourite_food = db.Column(db.String(120))
     bonus_claimed = db.Column(db.Boolean, default=False)
+    bread_bonus_claimed = db.Column(db.Boolean, default=False)
 
 
 class Match(db.Model):
