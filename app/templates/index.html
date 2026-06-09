@@ -384,7 +384,7 @@ border-radius: 10pt;">
 </div>
 {% endif %}
 
-<!-- ==================== VIEW BETS MODAL ==================== -->
+<!-- ==================== VIEW BETS MODAL ==================== 
 <div class="modal fade" id="viewBetsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content bg-dark text-white border-secondary">
@@ -400,7 +400,7 @@ border-radius: 10pt;">
             </div>
         </div>
     </div>
-</div>
+</div>-->
 
 <!-- Hidden Bread Easter Egg -->
 {% if current_user.is_authenticated and not current_user.bread_bonus_claimed %}
@@ -508,12 +508,4 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 </script>
-
-<!-- Back to Top -->
-<a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
-class="btn btn-primary rounded-circle shadow" 
-style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 2000; display: flex; align-items: center; justify-content: center;">
-<i class="fas fa-arrow-up fa-2x"></i>
-</a>
-
 {% endblock %}

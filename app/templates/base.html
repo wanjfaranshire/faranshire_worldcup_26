@@ -110,6 +110,138 @@
     input[type=number] {
         -moz-appearance: textfield;
     }
+body {
+        background: linear-gradient(rgba(0, 57, 99, 0.55), rgba(0, 57, 99, 0.55)), 
+        url('{{ url_for("static", filename="images/background.jpg") }}') no-repeat center center fixed;
+        background-size: cover;
+        font-family: 'Consolas', 'Courier New', 'Lucida Console', 'monospace';
+        min-height: 100vh;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* All your existing styles stay here */
+    .card {
+        background-color: rgba(20, 20, 35, 0.95) !important;
+        border: 1px solid #00ffff;
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    }
+    .card-header {
+        background-color: rgba(138, 43, 226, 0.9) !important;
+        color: white;
+        border-bottom: 2px solid #00ffff;
+    }
+    h1, h2, h5 {
+        color: #ffffff;
+        text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+    .text-warning {
+        color: #ff00ff !important;
+        text-shadow: 0 0 10px #ff00ff;
+    }
+/* Back to Top Button - Always Visible */
+/* ==================== BACK TO TOP - FINAL STRONG FIX ==================== */
+/* ==================== BACK TO TOP BUTTON ==================== */
+.back-to-top-btn {
+    position: fixed !important;
+    bottom: 35px !important;
+    right: 35px !important;
+    z-index: 999999 !important;
+    width: 68px !important;
+    height: 68px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: #00f5ff !important;
+    color: #000000 !important;
+    border: 3px solid #ffffff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.9) !important;
+    text-decoration: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.back-to-top-btn:hover {
+    transform: scale(1.15) !important;
+    box-shadow: 0 0 35px #00f5ff !important;
+}
+
+/* Make sure it turns monochrome properly */
+body.monochrome .back-to-top-btn {
+    filter: grayscale(100%) !important;
+    background-color: #555555 !important;
+    color: #eeeeee !important;
+    border-color: #aaaaaa !important;
+}
+
+
+        /* Make modal very visible */
+    #viewBetsModal .modal-content {
+        background-color: #1e1e2e !important;
+        border: 3px solid #00ffff !important;
+        box-shadow: 0 0 40px rgba(0, 255, 255, 0.7) !important;
+        filter: none !important; 
+        z-index: 1060 !important;
+    }
+
+    /* ... keep all your other existing styles ... */
+
+    /* ==================== MONOCHROME MODE ==================== */
+
+
+    /* 1. Only filter the main content, NOT the body or modals */
+    body.monochrome .container-fluid, 
+    body.monochrome .card, 
+    body.monochrome nav {
+        filter: grayscale(100%) !important;
+    }
+    
+/* ==================== MONOCHROME MODE ==================== */
+body.monochrome {
+    /*filter: grayscale(100%) contrast(1.1) !important;*/
+    background: linear-gradient(rgba(40, 40, 40, 0.9), rgba(40, 40, 40, 0.9)), 
+                url('{{ url_for("static", filename="images/bwbackground.jpg") }}') no-repeat center center fixed !important;
+    background-size: cover !important;
+}
+
+/* Protect all important elements from grayscale */
+body.monochrome .modal,
+body.monochrome .modal-content,
+body.monochrome .modal-dialog,
+body.monochrome .modal-body,
+body.monochrome .modal-header,
+body.monochrome .modal-footer,
+body.monochrome .card,
+body.monochrome .btn,
+body.monochrome .alert,
+body.monochrome .table,
+body.monochrome .form-control,
+body.monochrome .nav-link,
+body.monochrome .navbar{
+    filter: grayscale(100%) !important;
+}
+
+/* Fix modal freezing + positioning */
+.modal {
+    z-index: 10800 !important;
+}
+.modal-backdrop {
+    z-index: 10700 !important;
+}
+body.modal-open {
+    overflow: hidden !important; 
+}
+
+/* Make modal clearly visible */
+#viewBetsModal .modal-content,
+#userProfileModal .modal-content {
+    background-color: #1e1e2e !important;
+    border: 3px solid #00ffff !important;
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.7) !important;
+}
+
+
 </style>
 </head>
 <body>
@@ -162,7 +294,6 @@
             </li>
             {% endif %}
             {% else %}
-
             <li class="nav-item ms-3">
                 <a class="nav-link" href="{{ url_for('main.login') }}">Login</a>
             </li>
@@ -170,6 +301,12 @@
                 <a class="nav-link" href="{{ url_for('main.register') }}">Register</a>
             </li>
             {% endif %}
+             <li class="nav-item">
+                <button id="mono-toggle" class="btn btn-outline-light border-0 fs-4 px-3">
+    ☀️
+</button>
+            </li>
+
         </ul>
     </div>
 </div>
@@ -188,7 +325,139 @@
 
     {% block content %}{% endblock %}
 </div>
-
+<!-- Back to Top -->
+{% if request.endpoint in ['main.index', 'main.my_bets'] %}
+<a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+   class="back-to-top-btn"
+   style="position: fixed; bottom: 40px; right: 40px; z-index: 999999; width: 70px; height: 70px; 
+          display: flex; align-items: center; justify-content: center; background-color: #00f5ff; 
+          color: black; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 25px #00f5ff; 
+          font-size: 28px; text-decoration: none;">
+   <i class="fas fa-arrow-up"></i>
+</a>
+{% endif %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const monoBtn = document.getElementById('mono-toggle');
+    const body = document.body;
+
+    // Load saved preference
+    if (localStorage.getItem('monochrome') === 'true') {
+        body.classList.add('monochrome');
+        monoBtn.textContent = '🌙';
+    }
+
+    monoBtn.addEventListener('click', () => {
+        if (body.classList.contains('monochrome')) {
+            // Turn off monochrome
+            body.classList.remove('monochrome');
+            monoBtn.textContent = '☀️';
+            localStorage.setItem('monochrome', 'false');
+        } else {
+            // Turn on monochrome
+            body.classList.add('monochrome');
+            monoBtn.textContent = '🌙';
+            localStorage.setItem('monochrome', 'true');
+        }
+    });
+</script>
+<!-- ==================== VIEW BETS MODAL ==================== -->
+<div class="modal fade" id="viewBetsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="modalMatchName"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="betsTableContainer"></div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- User Profile Modal -->
+<div class="modal fade" id="userProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="modalUsername"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Profile Info -->
+                <!-- Profile Info -->
+<div class="row mb-4">
+    <!-- Nickname (Full Width) -->
+    <!-- Nickname (Full Row) -->
+    <div class="mb-2">
+        <strong>Nickname:</strong> 
+        <span id="modalNickname" class="text-info ms-2"></span>
+    </div>
+
+    <!-- Birthday + Zodiac Sign -->
+    <div class="row mb-2">
+        <div class="col-md-6">
+            <strong>Birthday:</strong> 
+            <span id="modalBirthday" class="text-info ms-2"></span>
+        </div>
+        <div class="col-md-6">
+            <strong>Zodiac Sign:</strong> 
+            <span id="modalZodiac" class="text-info ms-2"></span>
+        </div>
+    </div>
+
+    <!-- MBTI + Blood Type -->
+    <div class="row mb-2">
+        <div class="col-md-6">
+            <strong>MBTI:</strong> 
+            <span id="modalMBTI" class="text-info ms-2"></span>
+        </div>
+        <div class="col-md-6">
+            <strong>Blood Type:</strong> 
+            <span id="modalBloodType" class="text-info ms-2"></span>
+        </div>
+    </div>
+
+    <!-- Favourite Team + Favourite Food -->
+    <div class="row mb-2">
+        <div class="col-md-6">
+            <strong>Favourite Team:</strong> 
+            <span id="modalTeam" class="text-info ms-2"></span>
+        </div>
+        <div class="col-md-6">
+            <strong>Favourite Food:</strong> 
+            <span id="modalFood" class="text-info ms-2"></span>
+        </div>
+    </div>
+
+    <!-- Total Points + Wins & Losses -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <strong>Total Points:</strong> 
+            <span id="modalPoints" class="text-warning fw-bold ms-2"></span>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <span class="badge bg-success me-2">Wins: <span id="modalWins"></span></span>
+            <span class="badge bg-danger">Losses: <span id="modalLosses"></span></span>
+        </div>
+    </div>
+                <hr class="border-secondary">
+
+                <!-- Betting History -->
+                <h6 class="mb-4">Betting History</h6>
+                <div id="modalHistory"></div>
+
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
