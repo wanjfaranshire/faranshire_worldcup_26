@@ -103,7 +103,7 @@ def place_bet(match_id):
 
     match_date = match.date
     if match_date.tzinfo is None:
-        match_date = match_date.replace(tzinfo=timezone.utc)
+        match_time = match_time.replace(tzinfo=timezone(timedelta(hours=8)))
 
     # Block if result already entered
     if match.result:
@@ -812,7 +812,17 @@ def knockout_debug():
     output += "</table>"
     return output
 
-@bp.route('/time-check')
-def time_check():
-    from datetime import datetime, timezone
-    return f"Server Time (UTC): {datetime.now(timezone.utc)} | HKT Time: {now_hkt()}"
+@bp.route('/time-debug')
+def time_debug():
+    matches = Match.query.limit(5).all()
+    output = f"""
+    <h2>Time Debug</h2>
+    <p>Server now (HKT): {now_hkt()}</p>
+    <table border="1">
+        <tr><th>Match</th><th>Stored Date</th><th>Is Past?</th></tr>
+    """
+    for m in matches:
+        is_past = m.date < now_hkt()
+        output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m.date}</td><td>{is_past}</td></tr>"
+    output += "</table>"
+    return output
