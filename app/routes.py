@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 from app.models import User, Match, Bet, KnockoutMatch
 from app.forms import RegistrationForm, LoginForm
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import jsonify
 from sqlalchemy.orm import joinedload
 

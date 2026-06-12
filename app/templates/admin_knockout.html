@@ -25,7 +25,7 @@
                         <div class="card-header fw-bold">
                             {{ match.round_name }} - Match {{ match.match_number }}
                             {% if match.date %}
-                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
                             {% endif %}
                         </div>
                         <div class="card-body">
@@ -93,7 +93,7 @@
                         <div class="card-header fw-bold">
                             Round of 32 - Match {{ match.match_number }}
                             {% if match.date %}
-                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
                             {% endif %}
                         </div>
                         <div class="card-body">
