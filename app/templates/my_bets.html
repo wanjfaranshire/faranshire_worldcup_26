@@ -118,7 +118,7 @@
 
                                 {% else %}
     <!-- Active Bet -->
-    {% set match_started = bet.match.date < now %}
+    {% set match_started = bet.match.date.replace(tzinfo=None) < now.replace(tzinfo=None) %}
 
     <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) }}">
         <div class="row g-2 justify-content-center align-items-center mb-3">
