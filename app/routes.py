@@ -9,25 +9,31 @@ from flask import jsonify
 from sqlalchemy.orm import joinedload
 
 bp = Blueprint("main", __name__)
+
 def get_now_utc():
     return datetime.now(timezone.utc)
+
+def now_hkt():
+    return datetime.now(timezone.utc) + timedelta(hours=8)
 
 # ====================== HOME ======================
 @bp.route("/")
 def index():
     matches = Match.query.order_by(Match.date).all()
 
-    # Prepare data for "By Date" view
     from collections import defaultdict
-    from datetime import datetime
 
     matches_by_day = defaultdict(list)
     for match in matches:
-        day = match.date.date()  # Group by date only
+        day = match.date.date()
         matches_by_day[day].append(match)
         
-    return render_template("index.html", matches=matches, matches_by_day=matches_by_day, now=datetime.now())
-
+    return render_template(
+        "index.html", 
+        matches=matches, 
+        matches_by_day=matches_by_day, 
+        now=now_hkt()   # HKT aware
+    )
 
 # ====================== AUTH ======================
 @bp.route('/register', methods=['GET', 'POST'])
@@ -95,7 +101,8 @@ def logout():
 @bp.route("/place_bet/<int:match_id>", methods=["POST"])
 @login_required
 def place_bet(match_id):
-    from datetime import datetime
+    from datetime import datetime, timezone
+    current_utc = get_now_utc()
 
     match = Match.query.get_or_404(match_id)
 
@@ -109,7 +116,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match_date < get_now_utc():
+    if match_date < current_utc:
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
@@ -186,7 +193,7 @@ def my_bets():
         bets=user_bets,
         total_points=current_user.current_points,
         my_bets_by_day=my_bets_by_day,
-        now=datetime.now()           # ← Add this
+        now=now_hkt()           # ← Add this
     )
 
 

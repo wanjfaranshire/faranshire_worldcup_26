@@ -146,7 +146,7 @@ border-radius: 10pt;">
 <!-- ACTIVE -->
 {% if current_user.is_authenticated %}
 {% set bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first %}
-{% set match_started = match.date < now %}
+{% set match_started = match.date.replace(tzinfo=None) < now.replace(tzinfo=None) %}
 
 <!-- Bets Placed Indicator -->
 <div class="text-center mb-3">
@@ -306,7 +306,7 @@ border-radius: 10pt;">
 <!-- ACTIVE -->
 {% if current_user.is_authenticated %}
 {% set bet = match.bets|selectattr('user_id', 'equalto', current_user.id)|list|first %}
-{% set match_started = match.date < now %}
+{% set match_started = match.date.replace(tzinfo=None) < now.replace(tzinfo=None) %}
 
 <!-- Bets Placed Indicator -->
 <div class="text-center mb-3">
