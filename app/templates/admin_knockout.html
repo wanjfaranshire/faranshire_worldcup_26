@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="text-white mb-4">🏆 Knockout Stage Management</h1>
+
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="#results" data-bs-toggle="tab">1. Enter Results</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#setup" data-bs-toggle="tab">2. Round of 32 Setup</a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ENTER RESULTS TAB -->
+        <div class="tab-pane fade show active" id="results">
+            <h4 class="text-warning mb-3">Enter Match Results (One Time Only)</h4>
+            <div class="row">
+                {% for match in all_knockout_matches %}
+                <div class="col-lg-6 mb-4">
+                    <div class="card bg-dark border-light">
+                        <div class="card-header fw-bold">
+                            {{ match.round_name }} - Match {{ match.match_number }}
+                            {% if match.date %}
+                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('main.update_knockout_result', match_id=match.id) }}">
+                                <div class="row align-items-center text-center mb-3">
+                                    <div class="col-5">
+                                        <h5>{{ match.team1 or 'TBD' }}</h5>
+                                        <input type="number" name="home_score" class="form-control text-center" 
+                                               value="{{ match.home_score or '' }}" placeholder="Score"
+                                               {{ 'disabled' if match.is_completed else '' }} required>
+                                    </div>
+                                    <div class="col-2 fs-3 text-warning">VS</div>
+                                    <div class="col-5">
+                                        <h5>{{ match.team2 or 'TBD' }}</h5>
+                                        <input type="number" name="away_score" class="form-control text-center" 
+                                               value="{{ match.away_score or '' }}" placeholder="Score"
+                                               {{ 'disabled' if match.is_completed else '' }} required>
+                                    </div>
+                                </div>
+
+                                <div class="text-center mt-3">
+                                    <small class="text-light">Penalty Shootout (only if tie)</small>
+                                    <div class="row justify-content-center mt-2">
+                                        <div class="col-4">
+                                            <input type="number" name="home_penalty" class="form-control text-center" 
+                                                   value="{{ match.home_penalty or '' }}" placeholder="Home Pen"
+                                                   {{ 'disabled' if match.is_completed else '' }}>
+                                        </div>
+                                        <div class="col-1 text-warning">-</div>
+                                        <div class="col-4">
+                                            <input type="number" name="away_penalty" class="form-control text-center" 
+                                                   value="{{ match.away_penalty or '' }}" placeholder="Away Pen"
+                                                   {{ 'disabled' if match.is_completed else '' }}>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% if match.is_completed %}
+                                    <button type="button" class="btn btn-secondary w-100 mt-4" disabled>
+                                        Race Finished
+                                    </button>
+                                {% elif match.team1 and match.team2 %}
+                                    <button type="submit" class="btn btn-success w-100 mt-4">
+                                        Save Result
+                                    </button>
+                                {% else %}
+                                    <button type="button" class="btn btn-secondary w-100 mt-4" disabled>
+                                        TBD
+                                    </button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- ROUND OF 32 SETUP TAB -->
+        <div class="tab-pane fade" id="setup">
+            <h4 class="text-warning mb-3">Round of 32 - Team Assignment</h4>
+            <div class="row">
+                {% for match in round32_matches %}
+                <div class="col-lg-6 mb-4">
+                    <div class="card bg-dark border-light">
+                        <div class="card-header fw-bold">
+                            Round of 32 - Match {{ match.match_number }}
+                            {% if match.date %}
+                                • {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('main.update_knockout_team', match_id=match.id) }}">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label text-light small">
+                                            Home Team <span class="text-info">({{ match.home_placeholder or 'TBD' }})</span>
+                                        </label>
+                                        <select name="team1" class="form-select bg-dark text-white">
+                                            <option value="">-- Select --</option>
+                                            {% for team in all_teams %}
+                                            <option value="{{ team }}" 
+                                                    {{ 'selected' if match.team1 == team else '' }}
+                                                    {% if team in used_teams and team != match.team1 %}disabled{% endif %}>
+                                                {{ team }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label text-light small">
+                                            Away Team <span class="text-info">({{ match.away_placeholder or 'TBD' }})</span>
+                                        </label>
+                                        <select name="team2" class="form-select bg-dark text-white">
+                                            <option value="">-- Select --</option>
+                                            {% for team in all_teams %}
+                                            <option value="{{ team }}" 
+                                                    {{ 'selected' if match.team2 == team else '' }}
+                                                    {% if team in used_teams and team != match.team2 %}disabled{% endif %}>
+                                                {{ team }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 mt-3">Save Teams</button>
+                            </form>
+
+                            {% if match.team1 or match.team2 %}
+                                <form method="POST" action="{{ url_for('main.clear_knockout_teams', match_id=match.id) }}" class="mt-2">
+                                    <button type="submit" class="btn btn-outline-danger w-100"
+                                            onclick="return confirm('Clear teams for this match?')">
+                                        Clear Teams
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

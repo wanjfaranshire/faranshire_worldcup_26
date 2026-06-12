@@ -72,3 +72,56 @@ class Bet(db.Model):
             return int(stake * 1.5)
 
         return 0
+
+
+class KnockoutMatch(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    round_name = db.Column(db.String(60), nullable=False)
+    match_number = db.Column(db.Integer, nullable=False)
+    
+    # Placeholders from Sheet3 (e.g. "1E", "3ABCDF")
+    home_placeholder = db.Column(db.String(20), nullable=True)
+    away_placeholder = db.Column(db.String(20), nullable=True)
+    
+    # Actual teams
+    team1 = db.Column(db.String(100), nullable=True)
+    team2 = db.Column(db.String(100), nullable=True)
+    team1_code = db.Column(db.String(10), nullable=True)
+    team2_code = db.Column(db.String(10), nullable=True)
+    
+    date = db.Column(db.DateTime, nullable=True)
+    venue = db.Column(db.String(100), nullable=True)
+    
+    home_score = db.Column(db.Integer, nullable=True)
+    away_score = db.Column(db.Integer, nullable=True)
+    home_penalty = db.Column(db.Integer, nullable=True)
+    away_penalty = db.Column(db.Integer, nullable=True)
+    
+    winner = db.Column(db.String(100), nullable=True)
+    winner_code = db.Column(db.String(10), nullable=True)
+    is_completed = db.Column(db.Boolean, default=False)
+    
+    next_match_id = db.Column(db.Integer, nullable=True)
+    is_home_in_next = db.Column(db.Boolean, default=True)
+    
+    def calculate_winner(self):
+        if self.home_score is None or self.away_score is None:
+            return None
+            
+        if self.home_score > self.away_score:
+            self.winner = self.team1
+            self.winner_code = self.team1_code
+        elif self.away_score > self.home_score:
+            self.winner = self.team2
+            self.winner_code = self.team2_code
+        else:
+            # Penalty shootout
+            if self.home_penalty is not None and self.away_penalty is not None:
+                if self.home_penalty > self.away_penalty:
+                    self.winner = self.team1
+                    self.winner_code = self.team1_code
+                else:
+                    self.winner = self.team2
+                    self.winner_code = self.team2_code
+        return self.winner

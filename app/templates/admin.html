@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<a href="{{ url_for('main.admin_knockout') }}" class="btn btn-warning">Manage Knockout Stage</a>
 <div class="text-center mb-5">
     <h1 class="display-4 fw-bold">🔧 Admin - Update Match Results</h1>
     <p class="lead text-light">Enter real scores to calculate points</p>
@@ -58,7 +59,7 @@
                     <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
 
                         <div class="card-header text-white fw-bold py-2">
-                            {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+                            {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
                         </div>
 
                         <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
@@ -133,7 +134,7 @@
                 <div class="card bg-dark border-light h-100 shadow-lg d-flex flex-column">
 
                     <div class="card-header text-white fw-bold py-2">
-                        {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+                        {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
                     </div>
 
                     <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">

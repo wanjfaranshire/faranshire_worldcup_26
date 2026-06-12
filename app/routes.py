@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
-from app.models import User, Match, Bet
+from app.models import User, Match, Bet, KnockoutMatch
 from app.forms import RegistrationForm, LoginForm
 from datetime import datetime
 from flask import jsonify
@@ -615,3 +615,191 @@ def claim_lomo_bonus():
     db.session.commit()
 
     return "🤱 Secret lomo Bonus claimed! +300 points added!"
+
+# ==================== KNOCKOUT STAGE ADMIN ====================
+
+@bp.route('/admin/knockout')
+@login_required
+def admin_knockout():
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for('main.index'))
+    
+    all_knockout = KnockoutMatch.query.order_by(KnockoutMatch.date, KnockoutMatch.match_number).all()
+    
+    # Debug info
+    print("Total Knockout Matches:", len(all_knockout))
+    for m in all_knockout[:10]:   # print first 10
+        print(m.round_name, m.match_number, m.team1, m.team2)
+    
+    round32_matches = [m for m in all_knockout if str(m.round_name).strip().lower() == "round of 32"]
+    print("Round of 32 found:", len(round32_matches))
+    
+    # Get teams
+    all_teams_query = db.session.query(Match.team1).distinct().union(
+        db.session.query(Match.team2).distinct()).all()
+    all_teams = sorted([t[0] for t in all_teams_query if t[0]])
+    
+    return render_template('admin_knockout.html', 
+                           all_knockout_matches=all_knockout,
+                           round32_matches=round32_matches,
+                           all_teams=all_teams)
+
+
+# ==================== KNOCKOUT STAGE ADMIN ROUTES ====================
+
+@bp.route('/admin/knockout/update_team/<int:match_id>', methods=['POST'])
+@login_required
+def update_knockout_team(match_id):
+    """1. Update teams in Round of 32"""
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    match = KnockoutMatch.query.get_or_404(match_id)
+    
+    team1 = request.form.get('team1', '').strip()
+    team2 = request.form.get('team2', '').strip()
+    
+    if not team1 or not team2:
+        flash("Both teams are required.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    if team1 == team2:
+        flash("Cannot select the same team for both sides.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    # Check duplicate across Round of 32
+    existing = KnockoutMatch.query.filter(
+        KnockoutMatch.round_name.ilike("round of 32"),
+        KnockoutMatch.id != match_id
+    ).all()
+    
+    used = set()
+    for m in existing:
+        if m.team1: used.add(m.team1)
+        if m.team2: used.add(m.team2)
+    
+    if team1 in used or team2 in used:
+        flash("This team is already assigned to another Round of 32 match.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    # === UPDATE ===
+    match.team1 = team1
+    match.team2 = team2
+    # Optional: set codes if you have a mapping
+    # match.team1_code = get_team_code(team1)
+    # match.team2_code = get_team_code(team2)
+    
+    db.session.commit()
+    flash(f"Teams updated for Match {match.match_number}", "success")
+    return redirect(url_for('main.admin_knockout'))
+
+
+@bp.route('/admin/knockout/clear_teams/<int:match_id>', methods=['POST'])
+@login_required
+def clear_knockout_teams(match_id):
+    """Clear teams + full cascade clear downstream"""
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    match = KnockoutMatch.query.get_or_404(match_id)
+    
+    def clear_downstream(current_match):
+        current_match.team1 = None
+        current_match.team2 = None
+        current_match.team1_code = None
+        current_match.team2_code = None
+        current_match.home_score = None
+        current_match.away_score = None
+        current_match.home_penalty = None
+        current_match.away_penalty = None
+        current_match.winner = None
+        current_match.winner_code = None
+        current_match.is_completed = False
+        
+        if current_match.next_match_id:
+            next_m = KnockoutMatch.query.filter_by(match_number=current_match.next_match_id).first()
+            if next_m:
+                clear_downstream(next_m)
+    
+    clear_downstream(match)
+    db.session.commit()
+    flash(f"Cleared teams and all subsequent matches starting from Match {match.match_number}", "success")
+    return redirect(url_for('main.admin_knockout'))
+
+
+@bp.route('/admin/knockout/update_result/<int:match_id>', methods=['POST'])
+@login_required
+def update_knockout_result(match_id):
+    if not current_user.is_admin:
+        flash("Admin access required.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+    
+    match = KnockoutMatch.query.get_or_404(match_id)
+    
+    match.home_score = request.form.get('home_score', type=int)
+    match.away_score = request.form.get('away_score', type=int)
+    match.home_penalty = request.form.get('home_penalty', type=int)
+    match.away_penalty = request.form.get('away_penalty', type=int)
+    
+    winner = match.calculate_winner()
+    
+    if winner:
+        match.is_completed = True
+        match.winner = winner
+        match.winner_code = match.team1_code if winner == match.team1 else match.team2_code
+        
+        # === NORMAL BRACKET ADVANCE ===
+        if match.next_match_id:
+            next_match = KnockoutMatch.query.filter_by(match_number=match.next_match_id).first()
+            if next_match:
+                if match.is_home_in_next:
+                    next_match.team1 = winner
+                    next_match.team1_code = match.winner_code
+                else:
+                    next_match.team2 = winner
+                    next_match.team2_code = match.winner_code
+        
+        # === THIRD PLACE PLAY-OFF LOGIC (M103) ===
+        if match.round_name.lower() == "semifinal":
+            loser = match.team1 if winner == match.team2 else match.team2
+            loser_code = match.team1_code if winner == match.team2 else match.team2_code
+            
+            third_place = KnockoutMatch.query.filter_by(match_number=103).first()
+            if third_place:
+                if match.match_number == 101:   # Loser of M101 → Home in M103
+                    third_place.team1 = loser
+                    third_place.team1_code = loser_code
+                elif match.match_number == 102: # Loser of M102 → Away in M103
+                    third_place.team2 = loser
+                    third_place.team2_code = loser_code
+                
+                flash(f"Result saved. {winner} advanced. Loser {loser} to Third Place Play-off.", "success")
+            else:
+                flash(f"Result saved. Winner: {winner}", "success")
+        else:
+            flash(f"Result saved. Winner: {winner}", "success")
+    else:
+        flash("Result saved (incomplete).", "warning")
+    
+    db.session.commit()
+    return redirect(url_for('main.admin_knockout'))
+
+
+@bp.route('/admin/knockout/debug')
+@login_required
+def knockout_debug():
+    if not current_user.is_admin:
+        return "Admin only", 403
+    matches = KnockoutMatch.query.order_by(KnockoutMatch.round_name, KnockoutMatch.match_number).all()
+    
+    output = "<h2>Knockout Debug View</h2><table border=1 cellpadding=5>"
+    output += "<tr><th>Round</th><th>Match</th><th>Team1</th><th>Team2</th><th>Score</th><th>Winner</th><th>Next ID</th></tr>"
+    
+    for m in matches:
+        score = f"{m.home_score}-{m.away_score}" if m.home_score is not None else "-"
+        output += f"<tr><td>{m.round_name}</td><td>{m.match_number}</td><td>{m.team1 or '-'}</td><td>{m.team2 or '-'}</td><td>{score}</td><td><b>{m.winner or '-'}</b></td><td>{m.is_completed}</td><td>{m.next_match_id or '-'}</td></tr>"
+    output += "</table>"
+    return output
