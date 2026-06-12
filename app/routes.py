@@ -101,7 +101,7 @@ def place_bet(match_id):
 
     match_date = match.date
     if match_date.tzinfo is None:
-        match_time = match_time.replace(tzinfo=timezone(timedelta(hours=8)))
+        match_date = match_date.replace(tzinfo=timezone(timedelta(hours=8)))
 
     # Block if result already entered
     if match.result:
