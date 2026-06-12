@@ -9,8 +9,8 @@ from flask import jsonify
 from sqlalchemy.orm import joinedload
 
 bp = Blueprint("main", __name__)
-def now_hkt():
-    return datetime.now(timezone.utc) + timedelta(hours=8)
+def get_now_utc():
+    return datetime.now(timezone.utc)
 
 # ====================== HOME ======================
 @bp.route("/")
@@ -97,8 +97,6 @@ def logout():
 def place_bet(match_id):
     from datetime import datetime
 
-    current_time_hkt = now_hkt()
-
     match = Match.query.get_or_404(match_id)
 
     match_date = match.date
@@ -111,7 +109,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match_date < current_time_hkt:
+    if match_date < get_now_utc():
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
@@ -816,23 +814,25 @@ def knockout_debug():
 def time_debug():
     from datetime import timezone # Ensure this is imported
     matches = Match.query.limit(5).all()
-    current_hkt = now_hkt()
+    current_utc = get_now_utc()
     
     output = f"""
     <h2>Time Debug</h2>
-    <p>Server now (HKT): {current_hkt}</p>
+    <p>Server now (UTC): {current_utc}</p>
     <table border="1">
-        <tr><th>Match</th><th>Stored Date</th><th>Is Past?</th></tr>
+        <tr><th>Match</th><th>Origin Date</th><th>UTC Date</th><th>Origin is pass</th><th>utc Is Past?</th></tr>
     """
     for m in matches:
         # 1. Force the database date to be aware (if it isn't already)
         m_date = m.date
         if m_date.tzinfo is None:
-            m_date = m_date.replace(tzinfo=timezone.utc)
+            m_date_origin = m_date.replace(tzinfo=timezone(timedelta(hours=8)))
+            m_date_utc = m_date.replace(tzinfo=timezone.utc)
             
         # 2. Now compare two aware objects
-        is_past = m_date < current_hkt
+        is_past_origin = m_date_origin < current_utc
+        is_past_utc = m_date_utc < current_utc
         
-        output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m_date} (Aware)</td><td>{is_past}</td></tr>"
+        output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m_date_origin}</td>td><td>{m_date_utc}</td><td>{is_past_origin}</td><td>{is_past_utc}</td></tr>"
     output += "</table>"
     return output
