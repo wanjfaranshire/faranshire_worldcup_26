@@ -111,7 +111,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match.date < current_time_hkt:
+    if match_date < current_time_hkt:
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
