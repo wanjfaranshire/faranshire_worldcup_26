@@ -97,7 +97,13 @@ def logout():
 def place_bet(match_id):
     from datetime import datetime
 
+    current_time_hkt = now_hkt()
+
     match = Match.query.get_or_404(match_id)
+
+    match_date = match.date
+    if match_date.tzinfo is None:
+        match_date = match_date.replace(tzinfo=timezone.utc)
 
     # Block if result already entered
     if match.result:
@@ -105,7 +111,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match.date < now_hkt():
+    if match.date < current_time_hkt:
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
@@ -805,3 +811,8 @@ def knockout_debug():
         output += f"<tr><td>{m.round_name}</td><td>{m.match_number}</td><td>{m.team1 or '-'}</td><td>{m.team2 or '-'}</td><td>{score}</td><td><b>{m.winner or '-'}</b></td><td>{m.is_completed}</td><td>{m.next_match_id or '-'}</td></tr>"
     output += "</table>"
     return output
+
+@bp.route('/time-check')
+def time_check():
+    from datetime import datetime, timezone
+    return f"Server Time (UTC): {datetime.now(timezone.utc)} | HKT Time: {now_hkt()}"
