@@ -81,7 +81,7 @@ border-radius: 10pt;">
                 data-match-name="{{ match.team1 }} vs {{ match.team2 }}">
 
                 <div class="card-header text-white fw-bold py-2">
-                    {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                    {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
                 </div>
 
                 <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
@@ -241,7 +241,7 @@ border-radius: 10pt;">
             data-match-name="{{ match.team1 }} vs {{ match.team2 }}">
 
             <div class="card-header text-white fw-bold py-2">
-                {{ match.date.strftime('%a, %d %b • %I:%M %p') }} <small class="text-muted">(UTC)</small> • {{ match.venue or 'TBD' }}
+                {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
             </div>
 
             <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">

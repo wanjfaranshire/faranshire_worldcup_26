@@ -24,10 +24,8 @@ with app.app_context():
         # Combine date and time
         match_date = pd.to_datetime(row['date']).date()
         match_time = pd.to_datetime(row['time']).time()
-        
-        # Create naive datetime first
         naive_dt = datetime.combine(match_date, match_time)
-        
+                
         # Convert to UTC (this is the key change)
         utc_dt = naive_dt.replace(tzinfo=timezone.utc)
         

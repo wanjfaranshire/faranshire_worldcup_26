@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 from app.models import User, Match, Bet, KnockoutMatch
 from app.forms import RegistrationForm, LoginForm
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import jsonify
 from sqlalchemy.orm import joinedload
 
@@ -103,7 +103,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match.date < datetime.now():
+    if match.date < datetime.now(timezone.utc):
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
