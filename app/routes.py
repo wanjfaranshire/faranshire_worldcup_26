@@ -9,6 +9,8 @@ from flask import jsonify
 from sqlalchemy.orm import joinedload
 
 bp = Blueprint("main", __name__)
+def now_hkt():
+    return datetime.now(timezone.utc) + timedelta(hours=8)
 
 # ====================== HOME ======================
 @bp.route("/")
@@ -103,7 +105,7 @@ def place_bet(match_id):
         return redirect(url_for("main.index"))
 
     # Block if match time has already passed
-    if match.date < datetime.now(timezone.utc):
+    if match.date < now_hkt():
         flash("This match has already started. You can no longer place or update bets.", "danger")
         return redirect(url_for("main.index"))
 
