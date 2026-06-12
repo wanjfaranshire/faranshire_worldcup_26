@@ -814,15 +814,25 @@ def knockout_debug():
 
 @bp.route('/time-debug')
 def time_debug():
+    from datetime import timezone # Ensure this is imported
     matches = Match.query.limit(5).all()
+    current_hkt = now_hkt()
+    
     output = f"""
     <h2>Time Debug</h2>
-    <p>Server now (HKT): {now_hkt()}</p>
+    <p>Server now (HKT): {current_hkt}</p>
     <table border="1">
         <tr><th>Match</th><th>Stored Date</th><th>Is Past?</th></tr>
     """
     for m in matches:
-        is_past = m.date < now_hkt()
-        output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m.date}</td><td>{is_past}</td></tr>"
+        # 1. Force the database date to be aware (if it isn't already)
+        m_date = m.date
+        if m_date.tzinfo is None:
+            m_date = m_date.replace(tzinfo=timezone.utc)
+            
+        # 2. Now compare two aware objects
+        is_past = m_date < current_hkt
+        
+        output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m_date} (Aware)</td><td>{is_past}</td></tr>"
     output += "</table>"
     return output
