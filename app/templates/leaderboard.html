@@ -1,6 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+    .round-32 { background-color: #c724ff !important; color: white !important; }
+    .round-16 { background-color: #00f0ff !important; color: #000 !important; }
+    .quarterfinal { background-color: #00ff80 !important; color: #000 !important; }
+    .semifinal { background-color: #ff00ff !important; color: white !important; }
+    .final { background-color: #ffd700 !important; color: #000 !important; }
+    .third { background-color: #ffd700 !important; color: #000 !important; }
+</style>
 <div class="container py-4">
     <div class="row justify-content-center">
         <div class="col-lg-8 col-xl-7">   <!-- Controls the width -->
@@ -56,78 +64,116 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch(`/api/user_profile/${userId}`)
                 .then(response => response.json())
                 .then(data => {
+                    // 1. Calculate stats from the fetched data
+                    const groupHistory = data.group_history || [];
+                    const knockoutHistory = data.knockout_history || [];
+                    const allMatches = [...groupHistory, ...knockoutHistory];
+                    
+                    const totalWins = allMatches.filter(m => m.outcome === 'WIN').length;
+                    const totalLosses = allMatches.filter(m => m.outcome === 'LOSE').length;
+                    const totalPlayed = totalWins + totalLosses;
+
+                    let winRate = 0;
+                    if (totalPlayed > 0) {
+                        winRate = ((totalWins / totalPlayed) * 100).toFixed(1); 
+                    }
                     // Fill basic profile info
                     // Fill modal content
-    document.getElementById('modalUsername').textContent = data.username;
-    document.getElementById('modalNickname').textContent = data.nickname || '-';
-    document.getElementById('modalBirthday').textContent = data.birthday || '-';
-    document.getElementById('modalZodiac').textContent = data.zodiac_sign || '-';
-    document.getElementById('modalBloodType').textContent = data.blood_type || '-';
-    document.getElementById('modalMBTI').textContent = data.mbti || '-';
-    document.getElementById('modalTeam').textContent = data.favourite_team || '-';
-    document.getElementById('modalFood').textContent = data.favourite_food || '-';
-    document.getElementById('modalPoints').textContent = data.total_points;
-    document.getElementById('modalWins').textContent = data.wins;
-    document.getElementById('modalLosses').textContent = data.losses;
+                    document.getElementById('modalUsername').textContent = data.username;
+                    document.getElementById('modalNickname').textContent = data.nickname || '-';
+                    document.getElementById('modalBirthday').textContent = data.birthday || '-';
+                    document.getElementById('modalZodiac').textContent = data.zodiac_sign || '-';
+                    document.getElementById('modalBloodType').textContent = data.blood_type || '-';
+                    document.getElementById('modalMBTI').textContent = data.mbti || '-';
+                    document.getElementById('modalTeam').textContent = data.favourite_team || '-';
+                    document.getElementById('modalFood').textContent = data.favourite_food || '-';
+                    document.getElementById('modalPoints').textContent = data.total_points;
+                    document.getElementById('modalWins').textContent = data.wins;
+                    document.getElementById('modalLosses').textContent = data.losses;
+                    document.getElementById('modalWinRate').textContent = winRate;
 
                     // === Betting History Table ===
                     const historyContainer = document.getElementById('modalHistory');
                     historyContainer.innerHTML = '';
 
-                    if (data.history.length > 0) {
-                        // Group color mapping
-                        const groupColors = {
-                            'A': 'bg-primary', 'B': 'bg-success', 'C': 'bg-danger',
-                            'D': 'bg-warning text-dark', 'E': 'bg-info text-dark', 'F': 'bg-secondary',
-                            'G': 'bg-primary', 'H': 'bg-success', 'I': 'bg-danger',
-                            'J': 'bg-warning text-dark', 'K': 'bg-info text-dark', 'L': 'bg-secondary'
-                        };
+                    // Helper for row generation
+                    const generateRow = (item, type) => {
+                    // Determine Badge Class
+                        let badgeClass = 'bg-secondary';
+                        if (type === 'group') {
+                            const groupColors = { 'A': 'bg-primary', 'B': 'bg-success', 'C': 'bg-danger', 'D': 'bg-warning text-dark', 'E': 'bg-info text-dark', 'F': 'bg-secondary', 'G': 'bg-primary', 'H': 'bg-success', 'I': 'bg-danger', 'J': 'bg-warning text-dark', 'K': 'bg-info text-dark', 'L': 'bg-secondary' };
+                            badgeClass = groupColors[item.group] || 'bg-dark';
+                        } else if (type === 'knockout') {
+                            const roundName = item.round.toLowerCase();
+                            if (roundName.includes('32')) badgeClass = 'round-32';
+                            else if (roundName.includes('16')) badgeClass = 'round-16';
+                            else if (roundName.includes('quarter')) badgeClass = 'quarterfinal';
+                            else if (roundName.includes('semi')) badgeClass = 'semifinal';
+                            else if (roundName.includes('third')) badgeClass = 'third';
+                            else if (roundName.includes('final')) badgeClass = 'final';
+                        }
 
-                        let html = `
+                        let displayResult = item.match_result;
+                        if (displayResult.includes('(')) {
+                            // Split at the '(' to separate score and penalty
+                            const parts = displayResult.split('(');
+                            // Join them with a <br> instead of a space
+                            displayResult = `${parts[0]}<br><small class="text-info">(${parts[1]}</small>`;
+                        }
+
+                        const outcomeBadge = item.outcome === 'WIN' 
+                            ? '<span class="badge bg-success">WIN</span>' 
+                            : '<span class="badge bg-danger">LOSE</span>';
+
+                        return `
+                            <tr>
+                                <td class="text-center"><span class="badge ${badgeClass}">${type === 'group' ? item.group : item.round}</span></td>
+                                <td><strong>${item.match}</strong></td>
+                                <td class="text-center">${item.your_bet}</td>
+                                <td class="text-center align-middle text-info"><strong>${displayResult}</strong></td>
+                                <td class="text-center">${outcomeBadge}</td>
+                            </tr>`;
+                    };
+
+                    // 1. Group Stage Table
+                    if (data.group_history && data.group_history.length > 0) {
+                        historyContainer.innerHTML += `<h6 class="text-info mt-3">Group Stage</h6>
                             <div class="table-responsive">
-                                <table class="table table-dark table-sm table-bordered align-middle mb-0">
+                                <table class="table table-dark table-sm table-bordered align-middle" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-secondary text-dark">
                                         <tr>
                                             <th style="width: 70px;">Group</th>
                                             <th>Match</th>
-                                            <th style="width: 110px;">Their Bet</th>
-                                            <th style="width: 130px;">Match Result</th>
-                                            <th style="width: 90px;">Outcome</th>
+                                            <th style="width: 100px;">Their Bet</th>
+                                            <th style="width: 100px;">Result</th>
+                                            <th style="width: 80px;">Outcome</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                        `;
+                                    <tbody>${data.group_history.map(item => generateRow(item, 'group')).join('')}</tbody>
+                                </table>
+                            </div>`;
+                    }
 
-                        data.history.forEach(item => {
-                            const groupClass = groupColors[item.group] || 'bg-dark';
-                            const outcomeBadge = item.outcome === 'WIN' 
-                                ? '<span class="badge bg-success">WIN</span>' 
-                                : '<span class="badge bg-danger">LOSE</span>';
+                    // 2. Knockout Stage Table
+                    if (data.knockout_history && data.knockout_history.length > 0) {
+                        historyContainer.innerHTML += `<h6 class="text-warning mt-3">Knockout Stage</h6>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-sm table-bordered align-middle" style="table-layout: fixed; width: 100%;">
+                                    <thead class="table-secondary text-dark">
+                                        <tr>
+                                            <th style="width: 110px;">Round</th>
+                                            <th>Match</th>
+                                            <th style="width: 100px;">Their Bet</th>
+                                            <th style="width: 100px;">Result</th>
+                                            <th style="width: 80px;">Outcome</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${data.knockout_history.map(item => generateRow(item, 'knockout')).join('')}</tbody>
+                                </table>
+                            </div>`;
+                    }
 
-                            html += `
-                                <tr>
-                                    <td class="text-center">
-                                        <span class="badge ${groupClass}">${item.group}</span>
-                                    </td>
-                                    <td>
-                                        <strong>${item.match}</strong>
-                                    </td>
-                                    <td class="text-center">
-                                        <strong class="text-info">${item.your_bet}</strong>
-                                    </td>
-                                    <td class="text-center">
-                                        <strong>${item.match_result}</strong>
-                                    </td>
-                                    <td class="text-center">
-                                        ${outcomeBadge}
-                                    </td>
-                                </tr>
-                            `;
-                        });
-
-                        html += `</tbody></table></div>`;
-                        historyContainer.innerHTML = html;
-                    } else {
+                    if (data.group_history.length === 0 && data.knockout_history.length === 0) {
                         historyContainer.innerHTML = '<p class="text-muted mb-0">No completed bets yet.</p>';
                     }
 

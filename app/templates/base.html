@@ -250,7 +250,7 @@ body.modal-open {
     style="background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(12px); z-index: 1030;">
     <div class="container">
         <div class="d-flex align-items-center">
-            <a class="navbar-brand fw-bold fs-4 neon-text me-4" href="{{ url_for('main.index') }}">
+            <a class="navbar-brand fw-bold fs-4 neon-text me-4" href="{{ url_for('main.knockout') if is_knockout_stage else url_for('main.index') }}">
                 🍞🥞 World Cup 2026
             </a>
             
@@ -268,12 +268,22 @@ body.modal-open {
 
     <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto align-items-center">
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('main.index') }}">Home</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('main.how_to_play') }}">How to Play</a>
-            </li>
+            {% if is_knockout_stage %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.knockout') }}">Home</a>
+                </li>
+                <li class="nav-item">
+                    <!-- Point to the new group_stage route instead of index -->
+                    <a class="nav-link" href="{{ url_for('main.group_stage') }}">Group</a>
+                </li>
+            {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.index') }}">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.knockout') }}">Knockout</a>
+                </li>
+            {% endif %}
             <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('main.my_bets') }}">My Bets</a>
             </li>
@@ -282,6 +292,9 @@ body.modal-open {
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('main.leaderboard') }}">Leaderboard</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('main.how_to_play') }}">How to Play</a>
             </li>
             {% if current_user.is_authenticated %}
             <li class="nav-item ms-3">
@@ -361,7 +374,10 @@ body.modal-open {
             localStorage.setItem('monochrome', 'true');
         }
     });
+
 </script>
+
+
 <!-- ==================== VIEW BETS MODAL ==================== -->
 <div class="modal fade" id="viewBetsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -444,6 +460,7 @@ body.modal-open {
         <div class="col-md-6 text-md-end">
             <span class="badge bg-success me-2">Wins: <span id="modalWins"></span></span>
             <span class="badge bg-danger">Losses: <span id="modalLosses"></span></span>
+            <span class="badge bg-info text-dark">Win Rate: <span id="modalWinRate"></span>%</span>
         </div>
     </div>
                 <hr class="border-secondary">

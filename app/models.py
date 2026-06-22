@@ -47,12 +47,10 @@ class Bet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
-    
     home_score = db.Column(db.Integer, nullable=True)
     away_score = db.Column(db.Integer, nullable=True)
     stake = db.Column(db.Integer, default=50)
     points = db.Column(db.Integer, default=0)
-
     user = db.relationship('User', back_populates='bets')
     match = db.relationship('Match', back_populates='bets')
 
@@ -125,3 +123,44 @@ class KnockoutMatch(db.Model):
                     self.winner = self.team2
                     self.winner_code = self.team2_code
         return self.winner
+
+    def calculate_knockout_points(self, user_home, user_away, stake):
+        """Calculate points for knockout matches with round-based multipliers"""
+        if self.home_score is None or self.away_score is None:
+            return 0
+
+        stake = stake or 50
+        result_home = self.home_score
+        result_away = self.away_score
+
+        # Check exact score
+        if user_home == result_home and user_away == result_away:
+            multipliers = {
+                "Round of 32": 3.0,
+                "Round of 16": 4.0,
+                "Quarterfinal": 6.0,
+                "Semifinal": 7.0,
+                "Third Place": 8.0,
+                "Final": 10.0,
+            }
+            mult = multipliers.get(self.round_name, 2.0)
+            return int(stake * mult)
+
+        # Check correct winner (but wrong score)
+        user_win = 1 if user_home > user_away else 0 if user_home == user_away else 2
+        actual_win = 1 if result_home > result_away else 0 if result_home == result_away else 2
+
+        if user_win == actual_win:
+            multipliers = {
+                "Round of 32": 1.5,
+                "Round of 16": 2.0,
+                "Quarterfinal": 3.0,
+                "Semifinal": 3.5,
+                "Third Place": 4.0,
+                "Final": 5.0,
+            }
+            mult = multipliers.get(self.round_name, 1.5)
+            return int(stake * mult)
+
+        # Wrong winner → lose stake
+        return 0

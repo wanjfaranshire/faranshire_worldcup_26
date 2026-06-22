@@ -1,0 +1,755 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-4 fw-bold">🍞🥞 Faranshire Cup 2026 - Knockout Stage</h1>
+</div>
+
+<!-- View Toggle -->
+<div class="d-flex justify-content-center mb-3">
+    <div class="btn-group" role="group">
+        <a href="?view=bracket" 
+           class="btn {{ 'btn-primary active' if not request.args.get('view') or request.args.get('view') == 'bracket' else 'btn-outline-primary' }}">
+            Bracket View
+        </a>
+        <a href="?view=time" 
+           class="btn {{ 'btn-primary active' if request.args.get('view') == 'time' else 'btn-outline-primary' }}">
+            By Date
+        </a>
+    </div>
+</div>
+
+<!-- Zoom Controls - Only in Bracket View, below toggle -->
+{% if not request.args.get('view') or request.args.get('view') == 'bracket' %}
+<div class="d-flex justify-content-center mb-4">
+    <div class="btn-group" role="group">
+        <button onclick="zoomOut()" class="btn btn-outline-light px-3">-</button>
+        <button onclick="resetZoom()" class="btn btn-outline-light px-3">Reset</button>
+        <button onclick="zoomIn()" class="btn btn-outline-light px-3">+</button>
+    </div>
+</div>
+{% endif %}
+
+<style>
+  .bracket-wrapper {
+    overflow: hidden;
+    width: 100%;
+    height: 85vh; /* Reduced height */
+    min-height: 900px;
+    position: relative;
+    cursor: grab;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 20px;
+  }
+
+  .bracket-content {
+    transform-origin: center;
+    transition: transform 0.2s ease;
+    width: fit-content;
+    min-width: 1000px; /* Reduced total width */
+    padding: 20px 0;
+  }
+
+  .bracket-row {
+    display: flex;
+    gap: 40px;
+    min-width: 2900px;
+    justify-content: center;
+    padding: 30px 0;
+  }
+
+  .bracket-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 400px;
+  }
+
+  .bracket-column .card {
+    width: 400px !important;
+    height: 430px !important;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+  }
+
+.bracket-wrapper .round-of-16 {
+    margin-top: 225px;
+}
+.bracket-wrapper .quarterfinal {
+    margin-top: 665px;
+}
+.bracket-wrapper .semifinal {
+    margin-top: 1565px;
+}
+.bracket-wrapper .round-of-16 .card,
+.bracket-wrapper .quarterfinal .card,
+.bracket-wrapper .semifinal .card {
+    margin-bottom: 470px;
+}
+
+.bracket-wrapper .quarterfinal .card {
+    margin-bottom: 1370px;
+}
+
+.bracket-wrapper .center-final .card {
+    margin-bottom: 580px;
+}
+  /* Round Specific Styling */
+  .round-of-32 .card {
+    border-color: #c724ff !important;
+  }
+  .round-of-32 .card-header {
+    background: #2a0033 !important;
+    color: #c724ff !important;
+    border-bottom: 3px solid #c724ff !important;
+  }
+  .round-of-32 .neon-text {
+    color: #c724ff !important;
+    text-shadow: 0 0 12px #c724ff;
+  }
+
+  .round-of-16 .card {
+    border-color: #00f0ff !important;
+  }
+  .round-of-16 .card-header {
+    background: #003333 !important;
+    color: #00f0ff !important;
+    border-bottom: 3px solid #00f0ff !important;
+  }
+  .round-of-16 .neon-text {
+    color: #00f0ff !important;
+    text-shadow: 0 0 12px #00f0ff;
+  }
+
+  .quarterfinal .card {
+    border-color: #00ff80 !important;
+  }
+  .quarterfinal .card-header {
+    background: #002211 !important;
+    color: #00ff80 !important;
+    border-bottom: 3px solid #00ff80 !important;
+  }
+  .quarterfinal .neon-text {
+    color: #00ff80 !important;
+    text-shadow: 0 0 12px #00ff80;
+  }
+
+  .semifinal .card {
+    border-color: #ff00ff !important;
+  }
+  .semifinal .card-header {
+    background: #330033 !important;
+    color: #ff00ff !important;
+    border-bottom: 3px solid #ff00ff !important;
+  }
+  .semifinal .neon-text {
+    color: #ff00ff !important;
+    text-shadow: 0 0 12px #ff00ff;
+  }
+
+  .center-final .card {
+    border-color: #ffd700 !important;
+  }
+  .center-final .card-header {
+    background: #3d2a00 !important;
+    color: #ffd700 !important;
+    border-bottom: 3px solid #ffd700 !important;
+  }
+  .center-final .neon-text {
+    color: #ffd700 !important;
+    text-shadow: 0 0 15px #ffd700;
+  }
+
+  /* Round Specific Card + Header + Button Colors */
+  .round-of-32 .card {
+    border-color: #c724ff !important;
+  }
+  .round-of-32 .card-header {
+    background: #2a0033 !important;
+    color: #c724ff !important;
+  }
+  .round-of-32 .btn-success,
+  .round-of-32 .btn-warning {
+    background: #c724ff !important;
+    color: white !important;
+    border-color: #c724ff !important;
+  }
+
+  .round-of-16 .card {
+    border-color: #00f0ff !important;
+  }
+  .round-of-16 .card-header {
+    background: #003333 !important;
+    color: #00f0ff !important;
+  }
+  .round-of-16 .btn-success,
+  .round-of-16 .btn-warning {
+    background: #00f0ff !important;
+    color: black !important;
+    border-color: #00f0ff !important;
+  }
+
+  .quarterfinal .card {
+    border-color: #00ff80 !important;
+  }
+  .quarterfinal .card-header {
+    background: #002211 !important;
+    color: #00ff80 !important;
+  }
+  .quarterfinal .btn-success,
+  .quarterfinal .btn-warning {
+    background: #00ff80 !important;
+    color: black !important;
+    border-color: #00ff80 !important;
+  }
+
+  .semifinal .card {
+    border-color: #ff00ff !important;
+  }
+  .semifinal .card-header {
+    background: #330033 !important;
+    color: #ff00ff !important;
+  }
+  .semifinal .btn-success,
+  .semifinal .btn-warning {
+    background: #ff00ff !important;
+    color: white !important;
+    border-color: #ff00ff !important;
+  }
+
+  .center-final .card {
+    border-color: #ffd700 !important;
+  }
+  .center-final .card-header {
+    background: #3d2a00 !important;
+    color: #ffd700 !important;
+  }
+  .center-final .btn-success,
+  .center-final .btn-warning {
+    background: #ffd700 !important;
+    color: black !important;
+    border-color: #ffd700 !important;
+    font-weight: bold;
+  }
+
+  /* Bigger Round Headers */
+  /*.bracket-column h5 {
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+    text-shadow: 0 0 12px currentColor;
+    margin-bottom: 24px !important;
+    letter-spacing: 1px;
+}*/
+  .round-of-32 h5 {
+    font-size: 2.5rem !important;
+    color: #c724ff !important;
+    text-shadow: 0 0 12px #c724ff;
+    margin-bottom: 24px !important;
+  }
+  .round-of-16 h5 {
+    font-size: 2.5rem !important;
+    color: #00f0ff !important;
+    text-shadow: 0 0 12px #00f0ff;
+    margin-bottom: 24px !important;
+  }
+  .quarterfinal h5 {
+    font-size: 2.5rem !important;
+    color: #00ff80 !important;
+    text-shadow: 0 0 12px #00ff80;
+    margin-bottom: 24px !important;
+  }
+  .semifinal h5 {
+    font-size: 2.5rem !important;
+    color: #ff00ff !important;
+    text-shadow: 0 0 12px #ff00ff;
+    margin-bottom: 24px !important;
+  }
+  .center-final h4 {
+    font-size: 2.5rem !important;
+    color: #ffd700 !important;
+    text-shadow: 0 0 12px #ffd700;
+    margin-bottom: 24px !important;
+  }
+  .center-final h5 {
+    font-size: 2.5rem !important;
+    color: #ffd700 !important;
+    text-shadow: 0 0 12px #ffd700;
+    margin-bottom: 24px !important;
+  }
+
+  /* Glow effect */
+  .bracket-column .card {
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.12);
+  }
+  .card-body h5 {
+    font-size: 1.1rem !important; /* ~20px */
+    margin-bottom: 8px !important;
+  }
+  /* Place Bet Button - Transparent with Theme Border */
+    .btn-outline-theme {
+        background: transparent !important;
+        border-width: 2px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease;
+    }
+
+    /* Make sure each round uses its own neon color for outline button */
+    .round-of-32 .btn-outline-theme {
+        color: #c724ff !important;
+        border-color: #c724ff !important;
+    }
+    .round-of-16 .btn-outline-theme {
+        color: #00f0ff !important;
+        border-color: #00f0ff !important;
+    }
+    .quarterfinal .btn-outline-theme {
+        color: #00ff80 !important;
+        border-color: #00ff80 !important;
+    }
+    .semifinal .btn-outline-theme {
+        color: #ff00ff !important;
+        border-color: #ff00ff !important;
+    }
+    .center-final .btn-outline-theme {
+        color: #ffd700 !important;
+        border-color: #ffd700 !important;
+    }
+
+    /* Hover effect */
+    .btn-outline-theme:hover {
+        background: rgba(255,255,255,0.1) !important;
+    }
+
+</style>
+
+<!-- ==================== BRACKET VIEW ==================== -->
+{% if not request.args.get('view') or request.args.get('view') == 'bracket' %}
+<div class="bracket-wrapper" id="bracketWrapper">
+    <div class="bracket-content" id="bracketContent">
+        <div class="bracket-row">
+
+            <!-- LEFT BRACKET -->
+            <div class="bracket-column round-of-32">
+                <h5 class="text-warning text-center mb-4">Round of 32</h5>
+                {% for m in [74,77,73,75,83,84,81,82] %}
+                    {% set match = knockout_by_round.get('Round of 32', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="bracket-column round-of-16">
+                <h5 class="text-warning text-center mb-4">Round of 16</h5>
+                {% for m in [89,90,93,94] %}
+                    {% set match = knockout_by_round.get('Round of 16', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="bracket-column quarterfinal">
+                <h5 class="text-warning text-center mb-4">Quarterfinal</h5>
+                {% for m in [97,98] %}
+                    {% set match = knockout_by_round.get('Quarterfinal', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="bracket-column semifinal">
+                <h5 class="text-warning text-center mb-4">Semifinal</h5>
+                {% set match = knockout_by_round.get('Semifinal', [])|selectattr('match_number','equalto',101)|list|first %}
+                {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+            </div>
+
+            <!-- CENTER -->
+            <div class="bracket-column center-final text-center" style="margin-top: 900px; min-width: 420px;">
+                <h4 class="text-warning mb-4">FINAL</h4>
+                {% set final = knockout_by_round.get('Final', [])|first %}
+                {% if final %}{{ render_knockout_card(final) }}{% else %}<div class="card bg-dark border-warning border-2"></div>{% endif %}
+
+                <div class="mt-5">
+                    <h5 class="text-warning mb-4">Third Place</h5>
+                    {% set third = knockout_by_round.get('Third Place', [])|first %}
+                    {% if third %}{{ render_knockout_card(third) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                </div>
+            </div>
+
+            <!-- RIGHT BRACKET -->
+            <div class="bracket-column semifinal">
+                <h5 class="text-warning text-center mb-4">Semifinal</h5>
+                {% set match = knockout_by_round.get('Semifinal', [])|selectattr('match_number','equalto',102)|list|first %}
+                {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+            </div>
+
+            <div class="bracket-column quarterfinal">
+                <h5 class="text-warning text-center mb-4">Quarterfinal</h5>
+                {% for m in [99,100] %}
+                    {% set match = knockout_by_round.get('Quarterfinal', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="bracket-column round-of-16">
+                <h5 class="text-warning text-center mb-4">Round of 16</h5>
+                {% for m in [91,92,95,96] %}
+                    {% set match = knockout_by_round.get('Round of 16', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="bracket-column round-of-32">
+                <h5 class="text-warning text-center mb-4">Round of 32</h5>
+                {% for m in [76,78,79,80,86,88,85,87] %}
+                    {% set match = knockout_by_round.get('Round of 32', [])|selectattr('match_number','equalto',m)|list|first %}
+                    {% if match %}{{ render_knockout_card(match) }}{% else %}<div class="card bg-dark border-light"></div>{% endif %}
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ==================== BY DATE VIEW ==================== -->
+{% if request.args.get('view') == 'time' %}
+<div class="container mb-5" id="knockout-date-container"> {% for day, day_matches in knockout_by_day.items()|sort(attribute='0') %}
+        <h3 class="text-warning border-bottom pb-2 mb-4 mt-5">
+            {{ day.strftime('%A, %d %B %Y') }}
+        </h3>
+        
+        <div class="row row-cols-1 row-cols-lg-3 g-4">
+            {% for match in day_matches|sort(attribute='date') %}
+                <div class="col">
+                    {{ render_knockout_card(match, match.round_name|lower|replace(' ', '-') if match.round_name else '') }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+// ==================== BRACKET ZOOM & DRAG ====================
+let scale = 0.45;
+let isDragging = false;
+let startX, startY, scrollLeft, scrollTop;
+
+const wrapper = document.getElementById('bracketWrapper');
+const content = document.getElementById('bracketContent');
+
+function updateTransform() {
+    if (content) content.style.transform = `scale(${scale})`;
+}
+
+function zoomIn() { scale = Math.min(scale + 0.08, 1.8); updateTransform(); }
+function zoomOut() { scale = Math.max(scale - 0.08, 0.35); updateTransform(); }
+function resetZoom() {
+    scale = 0.45;
+    updateTransform();
+    centerContent();
+}
+
+function centerContent() {
+    if (!wrapper) return;
+    wrapper.scrollLeft = (wrapper.scrollWidth - wrapper.clientWidth) / 2;
+    wrapper.scrollTop = 1220;
+}
+
+// Drag handler
+if (wrapper) {
+    wrapper.addEventListener('mousedown', e => {
+        isDragging = true;
+        startX = e.pageX - wrapper.offsetLeft;
+        startY = e.pageY - wrapper.offsetTop;
+        scrollLeft = wrapper.scrollLeft;
+        scrollTop = wrapper.scrollTop;
+        wrapper.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        if (wrapper) wrapper.style.cursor = 'grab';
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!isDragging || !wrapper) return;
+        e.preventDefault();
+        const x = e.pageX - wrapper.offsetLeft;
+        const y = e.pageY - wrapper.offsetTop;
+        wrapper.scrollLeft = scrollLeft - (x - startX);
+        wrapper.scrollTop = scrollTop - (y - startY);
+    });
+}
+
+// Initialize
+updateTransform();
+setTimeout(centerContent, 100);
+
+// ==================== VIEW BETS MODAL (Fixed) ====================
+document.addEventListener('DOMContentLoaded', function() {
+    const modalElement = document.getElementById('viewBetsModal');
+    if (!modalElement) return;
+    
+    const modal = new bootstrap.Modal(modalElement);
+
+    // Use event delegation (much more reliable)
+    document.addEventListener('click', function(e) {
+        const card = e.target.closest('.match-card');
+        if (!card) return;
+
+        // Ignore clicks on form elements
+        if (e.target.closest('form') || e.target.closest('input') || 
+            e.target.closest('button') || e.target.closest('a')) {
+            return;
+        }
+
+        // Skip TBA matches
+        if (card.classList.contains('teams-tba')) {
+            return;
+        }
+
+        const matchId = card.dataset.matchId;
+        const matchName = card.dataset.matchName || "Match";
+
+        if (!matchId) return;
+
+        document.getElementById('modalMatchName').textContent = matchName;
+
+        fetch(`/api/match_bets/${matchId}`)
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('betsTableContainer');
+                container.innerHTML = '';
+
+                if (data.bets && data.bets.length > 0) {
+                    let html = `
+                        <div class="table-responsive">
+                            <table class="table table-dark table-sm table-bordered align-middle">
+                                <thead class="table-secondary text-dark">
+                                    <tr>
+                                        <th>Username</th>
+                                        <th class="text-center">Bet</th>
+                                        <th class="text-center">Stake</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                    data.bets.forEach(bet => {
+                        html += `
+                            <tr>
+                                <td><strong>${bet.username}</strong></td>
+                                <td class="text-center"><strong class="text-info">${bet.home_score} - ${bet.away_score}</strong></td>
+                                <td class="text-center">${bet.stake} pts</td>
+                            </tr>`;
+                    });
+                    html += `</tbody></table></div>`;
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p class="text-muted text-center">No bets placed yet on this match.</p>';
+                }
+
+                modal.show();
+            })
+            .catch(() => {
+                alert('Failed to load bets.');
+            });
+    });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Only run if we are in 'time' view
+    if (new URLSearchParams(window.location.search).get('view') !== 'time') return;
+
+    setTimeout(() => {
+        const now = new Date();
+        let nextMatchCard = null;
+        let closestTimeDiff = Infinity;
+
+        // Target the container we added above
+        document.querySelectorAll('#knockout-date-container .match-card').forEach(card => {
+            const timeStr = card.dataset.matchTime;
+            if (!timeStr) return;
+
+            const matchTime = new Date(timeStr);
+            const timeDiff = matchTime - now;
+
+            // Find the closest future match
+            if (timeDiff > 0 && timeDiff < closestTimeDiff) {
+                closestTimeDiff = timeDiff;
+                nextMatchCard = card;
+            }
+        });
+
+        // Fallback: if no future match, scroll to the top
+        if (!nextMatchCard) {
+            nextMatchCard = document.querySelector('#knockout-date-container .match-card');
+        }
+
+        if (nextMatchCard) {
+            const navbarHeight = 130; // Adjust based on your nav size
+            const cardPosition = nextMatchCard.getBoundingClientRect().top + window.scrollY;
+            
+            window.scrollTo({
+                top: cardPosition - navbarHeight - 30,
+                behavior: "smooth"
+            });
+        }
+    }, 700);
+});
+</script>
+
+{% endblock %}
+
+
+{% macro render_knockout_card(match, round_class='') %}
+{% set base_class = round_class|lower|replace(' ', '-') if round_class else '' %}
+{% set display_class = 'center-final' if base_class in ['final', 'third-place', 'third place'] else base_class %}
+
+{% if not match.team1 or not match.team2 %}
+<div class="card bg-dark border-light shadow-lg hover-card d-flex flex-column match-card teams-tba {{ display_class }}"
+     style="width: 400px; height: 430px;" 
+     data-match-id="{{ match.match_number }}"
+     data-match-name="Teams TBA">
+{% else %}
+<div class="card bg-dark border-light shadow-lg hover-card d-flex flex-column match-card {{ display_class }}"
+     style="width: 400px; height: 430px;" 
+     data-match-id="{{ match.match_number }}"
+     data-match-name="{{ (match.team1 or match.home_placeholder) }} vs {{ (match.team2 or match.away_placeholder) }}">
+{% endif %}
+
+    <div class="card-header text-white fw-bold py-2">
+        {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
+    </div>
+
+    <div class="card-body d-flex flex-column justify-content-center flex-grow-1 py-4">
+        <!-- Teams -->
+        <div class="row align-items-center text-center mb-4">
+            <div class="col-5">
+                {% if match.team1 %}
+                    <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team1) }}.png" class="flag-img mb-2 rounded-circle">
+                    <h5 class="fw-bold mb-0">{{ match.team1 }}</h5>
+                {% else %}
+                    <h5 class="text-muted">{{ match.home_placeholder or 'TBD' }}</h5>
+                {% endif %}
+            </div>
+            <div class="col-2">
+                <h1 class="text-warning mb-0 fw-bold neon-text" 
+                    style="font-size: 2.8rem; line-height: 1.0; white-space: nowrap !important;">VS</h1>
+            </div>
+            <div class="col-5">
+                {% if match.team2 %}
+                    <img src="https://flagcdn.com/w40/{{ get_flag_code(match.team2) }}.png" class="flag-img mb-2 rounded-circle">
+                    <h5 class="fw-bold mb-0">{{ match.team2 }}</h5>
+                {% else %}
+                    <h5 class="text-muted">{{ match.away_placeholder or 'TBD' }}</h5>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Bets Placed Counter -->
+        <div class="text-center mb-3">
+            <small class="text-info">
+                <i class="fas fa-users me-1"></i>
+                {{ match.bets|length if match.bets is defined else 0 }} bets placed
+            </small>
+        </div>
+
+        {% if match.is_completed or match.result %}
+            <!-- Finished Match -->
+            <div class="text-center mb-3">
+                <h2 class="text-info mb-1" style="font-size: 2.6rem;">
+                    {{ match.home_score }} - {{ match.away_score }}
+                </h2>
+                {% if match.home_penalty is not none and match.away_penalty is not none %}
+                    <div class="text-info" style="font-size: 1.45rem;">
+                        ({{ match.home_penalty }} - {{ match.away_penalty }})
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if current_user.is_authenticated %}
+                {% set bet = Bet.query.filter_by(user_id=current_user.id, match_id=match.match_number).first() %}
+                {% if bet %}
+                    <div class="text-center">
+                        <div class="row g-2 justify-content-center align-items-center mt-2">
+                            <div class="col-5">
+                                <input type="number" class="form-control text-center bg-dark text-white border-secondary" 
+                                       value="{{ bet.home_score }}" disabled>
+                            </div>
+                            <div class="col-1 text-center">
+                                <strong class="fs-4 text-warning">-</strong>
+                            </div>
+                            <div class="col-5">
+                                <input type="number" class="form-control text-center bg-dark text-white border-secondary" 
+                                       value="{{ bet.away_score }}" disabled>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+        {% else %}
+            <!-- Active Match -->
+            {% if not match.team1 or not match.team2 %}
+                <div class="alert alert-secondary text-center py-4">
+                    <strong>Teams TBA</strong><br>
+                    <small>Betting opens once teams are announced</small>
+                </div>
+            {% elif current_user.is_authenticated %}
+                {% set bet = Bet.query.filter_by(user_id=current_user.id, match_id=match.match_number).first() %}
+                {% set match_started = match.date.replace(tzinfo=None) < now.replace(tzinfo=None) %}
+
+                {% if match_started %}
+                    <div class="alert alert-warning text-center py-3 mb-3">
+                        <strong>Betting Closed</strong><br>
+                        <small>This match has already started</small>
+                    </div>
+                    {% if bet %}
+                        <div class="text-center">
+                            <small class="text-light">Your Bet:</small>
+                            <div class="row g-2 justify-content-center align-items-center mt-2">
+                                <div class="col-5">
+                                    <input type="number" class="form-control text-center bg-dark text-white border-secondary" 
+                                           value="{{ bet.home_score }}" disabled>
+                                </div>
+                                <div class="col-1 text-center">
+                                    <strong class="fs-4 text-warning">-</strong>
+                                </div>
+                                <div class="col-5">
+                                    <input type="number" class="form-control text-center bg-dark text-white border-secondary" 
+                                           value="{{ bet.away_score }}" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <form method="POST" action="{{ url_for('main.place_bet_knockout', match_id=match.id) }}" class="bet-form">
+                        <div class="row g-2 justify-content-center align-items-center mb-3">
+                            <div class="col-5">
+                                <input type="number" name="home_score" class="form-control text-center" 
+                                       value="{{ bet.home_score if bet else '' }}" min="0" required>
+                            </div>
+                            <div class="col-1 text-center">
+                                <strong class="fs-4 text-warning">-</strong>
+                            </div>
+                            <div class="col-5">
+                                <input type="number" name="away_score" class="form-control text-center" 
+                                       value="{{ bet.away_score if bet else '' }}" min="0" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-light small">Stake (min 50 pts)</label>
+                            <input type="number" name="stake" class="form-control text-center" 
+                                   value="{{ bet.stake if bet else 50 }}" min="50" required>
+                        </div>
+                        <button type="submit" class="btn w-100 {% if bet %}btn-warning{% else %}btn-outline-theme{% endif %}">
+                            {{ 'Update Bet' if bet else 'Place Bet' }}
+                        </button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <a href="{{ url_for('main.login') }}" class="btn btn-outline-light w-100 mt-3">
+                    Login to Place Bet
+                </a>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

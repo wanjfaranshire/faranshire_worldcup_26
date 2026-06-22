@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="text-center mb-5">
-    <h1 class="display-4 fw-bold">🍞🥞 Faranshire Cup 2026</h1>
+    <h1 class="display-4 fw-bold">🍞🥞 Faranshire Cup 2026 - Group Stage</h1>
     <p class="lead text-light">Friends & Colleagues Swimming Pool</p>
 </div>
 <style>
@@ -228,7 +228,7 @@ border-radius: 10pt;">
 
 <!-- ==================== BY DATE VIEW ==================== -->
 {% if request.args.get('view') == 'time' %}
-<div class="container">
+<div class="container mb-5" id="date-view-container">
     {% for day, day_matches in matches_by_day.items() %}
     <h3 class="text-warning border-bottom pb-2 mb-4 mt-5">
         {{ day.strftime('%A, %d %B %Y') }}
@@ -238,7 +238,8 @@ border-radius: 10pt;">
         <div class="col">
             <div class="card bg-dark border-light h-100 shadow-lg hover-card d-flex flex-column match-card"
             data-match-id="{{ match.id }}"
-            data-match-name="{{ match.team1 }} vs {{ match.team2 }}">
+            data-match-name="{{ match.team1 }} vs {{ match.team2 }}"
+            data-match-time="{{ match.date.isoformat() }}">
 
             <div class="card-header text-white fw-bold py-2">
                 {{ match.date.strftime('%a, %d %b • %I:%M %p') }} • {{ match.venue or 'TBD' }}
@@ -366,6 +367,49 @@ border-radius: 10pt;">
             {{ 'Update Bet' if bet else 'Place Bet' }}
         </button>
     </form>
+
+<!-- Smart Auto Scroll to Next Upcoming Match -->
+<!-- Smart Auto Scroll to Next Upcoming Match with Top Margin -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (!window.location.search.includes('view=time')) return;
+
+    setTimeout(() => {
+        const now = new Date();
+        let nextMatchCard = null;
+        let closestTimeDiff = Infinity;
+
+        document.querySelectorAll('#date-view-container .match-card').forEach(card => {
+            const timeStr = card.dataset.matchTime;
+            if (!timeStr) return;
+
+            const matchTime = new Date(timeStr);
+            const timeDiff = matchTime - now;
+
+            if (timeDiff > 0 && timeDiff < closestTimeDiff) {
+                closestTimeDiff = timeDiff;
+                nextMatchCard = card;
+            }
+        });
+
+        if (!nextMatchCard) {
+            nextMatchCard = document.querySelector('#date-view-container .match-card');
+        }
+
+        if (nextMatchCard) {
+            const navbarHeight = 130; // Adjust this if your navbar is taller
+
+            const cardPosition = nextMatchCard.getBoundingClientRect().top + window.scrollY;
+            
+            window.scrollTo({
+                top: cardPosition - navbarHeight - 20,   // 20px extra breathing room
+                behavior: "smooth"
+            });
+        }
+    }, 500);
+});
+</script>
+
 {% endif %}
 
 {% else %}

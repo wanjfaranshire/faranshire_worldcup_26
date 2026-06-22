@@ -34,6 +34,7 @@ def create_app():
     from .models import User
     from .models import Match
     from .models import Bet
+    from .models import KnockoutMatch
 
     @login_manager.user_loader
     def load_user(user_id):

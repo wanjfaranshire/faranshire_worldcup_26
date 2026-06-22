@@ -16,13 +16,23 @@ def get_now_utc():
 def now_hkt():
     return datetime.now(timezone.utc) + timedelta(hours=8)
 
+# Assuming your blueprint is named 'bp'
+@bp.app_context_processor
+def inject_navigation_stage():    
+    HKT = timezone(timedelta(hours=8))
+    switch_time = datetime(2026, 6, 28, 12, 0, 0, tzinfo=HKT)
+    now = datetime.now(HKT)
+    
+    return {
+        'is_knockout_stage': now >= switch_time
+    }
+
 # ====================== HOME ======================
-@bp.route("/")
-def index():
+@bp.route("/group")
+def group_stage():
+    # This route will ALWAYS show the group page, no redirect
     matches = Match.query.order_by(Match.date).all()
-
     from collections import defaultdict
-
     matches_by_day = defaultdict(list)
     for match in matches:
         day = match.date.date()
@@ -32,8 +42,20 @@ def index():
         "index.html", 
         matches=matches, 
         matches_by_day=matches_by_day, 
-        now=now_hkt()   # HKT aware
+        now=now_hkt()
     )
+
+@bp.route("/")
+@bp.route("/index")
+def index():
+    # This route keeps the redirect logic for the "Home" button
+    HKT = timezone(timedelta(hours=8))
+    switch_time = datetime(2026, 6, 28, 12, 0, 0, tzinfo=HKT)
+    if datetime.now(HKT) >= switch_time:
+        return redirect(url_for("main.knockout"))
+    
+    # Otherwise, just call the group stage logic
+    return group_stage()
 
 # ====================== AUTH ======================
 @bp.route('/register', methods=['GET', 'POST'])
@@ -178,23 +200,39 @@ def place_bet(match_id):
 @bp.route("/my_bets")
 @login_required
 def my_bets():
-    from datetime import datetime
     from collections import defaultdict
+    from datetime import datetime
 
     user_bets = Bet.query.filter_by(user_id=current_user.id).all()
-
     my_bets_by_day = defaultdict(list)
-    for bet in user_bets:
-        day = bet.match.date.date()
-        my_bets_by_day[day].append(bet)
 
-    return render_template(
-        "my_bets.html",
-        bets=user_bets,
-        total_points=current_user.current_points,
-        my_bets_by_day=my_bets_by_day,
-        now=now_hkt()           # ← Add this
-    )
+    for bet in user_bets:
+        match = None
+        if bet.match:                    # Group Stage
+            match = bet.match
+        elif bet.match_id:               # Knockout Stage
+            knockout_match = KnockoutMatch.query.filter_by(match_number=bet.match_id).first()
+            if knockout_match:
+                match = knockout_match
+
+        if match and match.date:
+            day = match.date.date()
+            my_bets_by_day[day].append(bet)
+        else:
+            day = datetime.now().date()
+            my_bets_by_day[day].append(bet)
+
+    sorted_bets_by_day = dict(sorted(my_bets_by_day.items()))
+
+    # Pass knockout matches for rendering
+    knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
+
+    return render_template("my_bets.html",
+                           bets=user_bets,                    # fixed: plural
+                           my_bets_by_day=sorted_bets_by_day,
+                           total_points=current_user.current_points,
+                           knockout_matches=knockout_matches,
+                           now=now_hkt())
 
 
 @bp.route("/leaderboard")
@@ -207,6 +245,8 @@ def leaderboard():
     return render_template("leaderboard.html", users=users)
 
 
+from app.models import Bet, KnockoutMatch  # Ensure you have this import
+
 @bp.route("/delete_bet/<int:bet_id>", methods=["POST"])
 @login_required
 def delete_bet(bet_id):
@@ -216,7 +256,21 @@ def delete_bet(bet_id):
         flash("You can only delete your own bets.", "danger")
         return redirect(url_for("main.my_bets"))
 
-    if bet.match.result:
+    # Determine if the match is finished based on type
+    is_finished = False
+    
+    # Check Group Stage
+    if bet.match:
+        if bet.match.result is not None:
+            is_finished = True
+    
+    # Check Knockout Stage (using match_id as identifier)
+    elif bet.match_id:
+        km = KnockoutMatch.query.filter_by(match_number=bet.match_id).first()
+        if km and km.is_completed:
+            is_finished = True
+
+    if is_finished:
         flash("Cannot delete bet on a finished match.", "danger")
         return redirect(url_for("main.my_bets"))
 
@@ -383,36 +437,56 @@ def clear_result(match_id):
 
 
 # ==================== PROFILE ====================
-@bp.route('/profile', methods=['GET', 'POST'])
+from datetime import datetime
+
+@bp.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
-    if request.method == 'POST':
-        current_user.nickname = request.form.get('nickname', '').strip()
+    if request.method == "POST":
+        current_user.nickname = request.form.get("nickname")
+        current_user.birthday = request.form.get("birthday")
+        current_user.zodiac_sign = request.form.get("zodiac_sign")
+        current_user.mbti = request.form.get("mbti")
+        current_user.blood_type = request.form.get("blood_type")
+        current_user.favourite_team = request.form.get("favourite_team")
+        current_user.favourite_food = request.form.get("favourite_food")
         
-        # Birthday
-        current_user.birthday = request.form.get('birthday', '').strip()
-        current_user.zodiac_sign = request.form.get('zodiac_sign', '').strip()
-        current_user.blood_type = request.form.get('blood_type', '').strip()
-        current_user.mbti = request.form.get('mbti', '').strip()
-        current_user.favourite_team = request.form.get('favourite_team', '').strip()
-        current_user.favourite_food = request.form.get('favourite_food', '').strip()
-
         db.session.commit()
-        db.session.refresh(current_user)
-        flash('Profile updated successfully!', 'success')
-        return redirect(url_for('main.profile'))
+        flash("Profile updated successfully!", "success")
+        return redirect(url_for("main.profile"))
 
-    history = (
-        Bet.query
-        .options(joinedload(Bet.match))
-        .filter(Bet.user_id == current_user.id)
-        .join(Match)
-        .filter(Match.result.isnot(None))
-        .order_by(Match.group.asc(), Match.date.asc())
-        .all()
-    )
+    # Get all user bets
+    all_bets = Bet.query.filter_by(user_id=current_user.id).all()
 
-    return render_template('profile.html', history=history)
+    group_history = []
+    knockout_history = []
+
+    for bet in all_bets:
+        if bet.match:                    # Group Stage
+            group_history.append(bet)
+        else:                            # Knockout Stage
+            knockout_history.append(bet)
+
+    # === Sort Group Stage: by Group (A-L) then by Date ===
+    def group_sort_key(b):
+        group_order = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,'K':10,'L':11}
+        group_val = b.match.group if b.match and b.match.group else 'Z'
+        date_val = b.match.date if b.match and b.match.date else datetime.min
+        return (group_order.get(group_val, 99), date_val)
+
+    group_history.sort(key=group_sort_key)
+
+    # Sort Knockout newest first
+    knockout_history.sort(key=lambda b: b.match_id or 0, reverse=True)
+
+    # Knockout lookup
+    knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
+
+    return render_template("profile.html",
+                           group_history=group_history,
+                           knockout_history=knockout_history,
+                           knockout_matches=knockout_matches,
+                           total_points=current_user.current_points)
 
 
 # ==================== USER PROFILE API (for modal) ====================
@@ -420,61 +494,96 @@ def profile():
 @login_required
 def user_profile_api(user_id):
     user = User.query.get_or_404(user_id)
-
-    # ✅ Correctly filter bets by this specific user
-    bets = (
-        Bet.query
-        .options(joinedload(Bet.match))
-        .filter_by(user_id=user.id)                    # ← Important
-        .join(Match)
-        .filter(Match.result.isnot(None))
-        .order_by(Match.group.asc(), Match.date.asc())
-        .all()
-    )
-
-    history = []
+    all_bets = Bet.query.filter_by(user_id=user.id).all()
+    
+    knockout_map = {km.match_number: km for km in KnockoutMatch.query.all()}
+    
+    group_history = []
+    knockout_history = []
     wins = 0
     losses = 0
 
-    for bet in bets:
-        if bet.points and bet.points > 0:
-            wins += 1
-            outcome = "WIN"
-        else:
-            losses += 1
-            outcome = "LOSE"
+    for bet in all_bets:
+        # 1. Group Stage Logic
+        if bet.match and bet.match.result is not None:
+            outcome = "WIN" if (bet.points and bet.points > 0) else "LOSE"
+            if outcome == "WIN": wins += 1
+            else: losses += 1
+            
+            group_history.append({
+                "group": bet.match.group,
+                "date": bet.match.date, # Keep for sorting
+                "match": f"{bet.match.team1} vs {bet.match.team2}",
+                "your_bet": f"{bet.home_score} - {bet.away_score}",
+                "match_result": bet.match.result,
+                "outcome": outcome
+            })
 
-        history.append({
-            "group": bet.match.group,
-            "match": f"{bet.match.team1} vs {bet.match.team2}",
-            "your_bet": f"{bet.home_score} - {bet.away_score}",
-            "match_result": bet.match.result,
-            "outcome": outcome
-        })
+        # 2. Knockout Stage Logic
+        elif bet.match_id in knockout_map and knockout_map[bet.match_id].is_completed:
+            km = knockout_map[bet.match_id]
+            outcome = "WIN" if (bet.points and bet.points > 0) else "LOSE"
+            if outcome == "WIN": wins += 1
+            else: losses += 1
+            
+            penalty_str = ""
+            if km.home_penalty is not None and km.away_penalty is not None:
+                penalty_str = f" ({km.home_penalty} - {km.away_penalty})"
+
+            knockout_history.append({
+                "match_id": km.match_number, # Keep for sorting
+                "round": km.round_name,
+                "match": f"{km.team1 or 'TBD'} vs {km.team2 or 'TBD'}",
+                "your_bet": f"{bet.home_score} - {bet.away_score}",
+                "match_result": f"{km.home_score} - {km.away_score}{penalty_str}",
+                "outcome": outcome
+            })
+
+    # === Apply Sorting to match profile.html logic ===
+    
+    # Sort Group: by Group (A-L) then by Date
+    group_order = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,'K':10,'L':11}
+    group_history.sort(key=lambda x: (group_order.get(x['group'], 99), x['date']))
+
+    # Sort Knockout: newest match_id first
+    knockout_history.sort(key=lambda x: x['match_id'], reverse=True)
 
     data = {
         "username": user.username,
         "nickname": user.nickname,
-        "birthday": user.birthday if user.birthday else None,
+        "birthday": user.birthday,
         "zodiac_sign": user.zodiac_sign,
         "blood_type": user.blood_type,
         "mbti": user.mbti,
         "favourite_team": user.favourite_team,
         "favourite_food": user.favourite_food,
         "total_points": user.current_points,
+        # ADD THESE TWO LINES:
         "wins": wins,
         "losses": losses,
-        "history": history
+        # -------------------
+        "group_history": group_history,
+        "knockout_history": knockout_history
     }
     return jsonify(data)
+
 
 @bp.route('/api/match_bets/<int:match_id>')
 @login_required
 def match_bets_api(match_id):
-    match = Match.query.get_or_404(match_id)
+    # Try to find as Group Stage Match first (by id)
+    match = Match.query.get(match_id)
     
+    if not match:
+        # Try as Knockout Match (by match_number)
+        match = KnockoutMatch.query.filter_by(match_number=match_id).first()
+
+    if not match:
+        return jsonify({"error": "Match not found"}), 404
+
+    # Get bets using the stored match_id (which is match_number for knockout)
     bets = Bet.query.filter_by(match_id=match_id).all()
-    
+
     bet_list = []
     for bet in bets:
         bet_list.append({
@@ -482,11 +591,17 @@ def match_bets_api(match_id):
             "home_score": bet.home_score,
             "away_score": bet.away_score,
             "stake": bet.stake,
-            "points": bet.points if match.result else None
+            "points": bet.points if getattr(match, 'result', None) or getattr(match, 'is_completed', False) else None
         })
-    
+
+    # Build nice match name
+    if hasattr(match, 'match_number'):   # KnockoutMatch
+        match_name = f"Match {match.match_number} - {match.team1 or match.home_placeholder} vs {match.team2 or match.away_placeholder}"
+    else:  # Group Stage
+        match_name = f"{match.team1} vs {match.team2}"
+
     return jsonify({
-        "match": f"{match.team1} vs {match.team2}",
+        "match": match_name,
         "total_bets": len(bet_list),
         "bets": bet_list
     })
@@ -656,6 +771,7 @@ def admin_knockout():
     return render_template('admin_knockout.html', 
                            all_knockout_matches=all_knockout,
                            round32_matches=round32_matches,
+                           now=now_hkt(),
                            all_teams=all_teams)
 
 
@@ -843,3 +959,104 @@ def time_debug():
         output += f"<tr><td>{m.team1} vs {m.team2}</td><td>{m_date_origin}</td>td><td>{m_date_utc}</td><td>{is_past_origin}</td><td>{is_past_utc}</td></tr>"
     output += "</table>"
     return output
+
+# ====================== PUBLIC KNOCKOUT BRACKET ======================
+@bp.route("/knockout")
+def knockout():
+    all_knockout = KnockoutMatch.query.order_by(
+        KnockoutMatch.date, KnockoutMatch.match_number
+    ).all()
+
+    from collections import defaultdict
+    knockout_by_round = defaultdict(list)
+    knockout_by_day = defaultdict(list)
+
+    for match in all_knockout:
+        round_name = match.round_name.strip()
+        knockout_by_round[round_name].append(match)
+        
+        # Group by date for "By Date" view
+        day = match.date.date()
+        knockout_by_day[day].append(match)
+
+    # Sort rounds
+    round_order = ["Round of 32", "Round of 16", "Quarterfinal", "Semifinal", "Third Place", "Final"]
+    sorted_rounds = {r: knockout_by_round[r] for r in round_order if r in knockout_by_round}
+
+    return render_template("knockout.html", 
+                           knockout_by_round=sorted_rounds,
+                           knockout_by_day=knockout_by_day,
+                           Bet=Bet,
+                           now=now_hkt())
+
+# ====================== KNOCKOUT STAGE BETTING ======================
+@bp.route("/place_bet_knockout/<int:match_id>", methods=["POST"])
+@login_required
+def place_bet_knockout(match_id):
+    from datetime import timezone, timedelta
+    current_utc = get_now_utc()
+
+    match = KnockoutMatch.query.get_or_404(match_id)
+
+    match_date = match.date
+    if match_date.tzinfo is None:
+        match_date = match_date.replace(tzinfo=timezone(timedelta(hours=8)))
+
+    if match.is_completed:
+        flash("This match has already finished.", "danger")
+        return redirect(url_for("main.knockout"))
+
+    if match_date < current_utc:
+        flash("This match has already started. You can no longer place or update bets.", "danger")
+        return redirect(url_for("main.knockout"))
+
+    try:
+        home_score = request.form.get("home_score", type=int)
+        away_score = request.form.get("away_score", type=int)
+        new_stake = request.form.get("stake", type=int, default=50)
+
+        if new_stake < 50 or home_score is None or away_score is None:
+            flash("Please enter valid scores and stake.", "danger")
+            return redirect(url_for("main.knockout"))
+
+        # Use match_number instead of id
+        knockout_match_number = match.match_number
+
+        existing_bet = Bet.query.filter_by(
+            user_id=current_user.id, 
+            match_id=knockout_match_number
+        ).first()
+
+        if existing_bet:
+            old_stake = existing_bet.stake or 0
+            difference = new_stake - old_stake
+            current_user.points += (old_stake - new_stake)
+            existing_bet.home_score = home_score
+            existing_bet.away_score = away_score
+            existing_bet.stake = new_stake
+        else:
+            if current_user.current_points < new_stake:
+                flash("Not enough points!", "danger")
+                return redirect(url_for("main.knockout"))
+
+            current_user.points -= new_stake
+
+            bet = Bet(
+                user_id=current_user.id,
+                match_id=knockout_match_number,   # ← Using match_number
+                home_score=home_score,
+                away_score=away_score,
+                stake=new_stake,
+                points=0,
+            )
+            db.session.add(bet)
+
+        db.session.commit()
+        flash("✅ Bet placed / updated successfully!", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Failed to save bet: {str(e)}", "danger")
+        print(f"KNOCKOUT BET ERROR: {str(e)}")
+
+    return redirect(url_for("main.knockout"))
