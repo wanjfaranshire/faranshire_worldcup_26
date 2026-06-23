@@ -677,6 +677,18 @@ def seed_database():
     except Exception as e:
         return f"❌ Seeding Error: {str(e)}"
 
+@bp.route("/seed-knockout")
+def seed_knockout():
+    if not current_user.is_admin:
+        return "Admin only", 403
+    
+    try:
+        from seed_knockout import seed_knockout as run_seed
+        run_seed()
+        return "✅ Knockout stage seeded successfully!"
+    except Exception as e:
+        return f"❌ Error: {str(e)}", 500
+
 @bp.route('/db-check')
 def db_check():
     try:
