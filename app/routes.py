@@ -678,16 +678,29 @@ def seed_database():
         return f"❌ Seeding Error: {str(e)}"
 
 @bp.route("/seed-knockout")
+@login_required
 def seed_knockout():
     if not current_user.is_admin:
-        return "Admin only", 403
+        flash("Admin access required.", "danger")
+        return redirect(url_for("main.index"))
     
     try:
-        from seed_knockout import seed_knockout as run_seed
-        run_seed()
-        return "✅ Knockout stage seeded successfully!"
+        from seed_knockout import seed_knockout
+        seed_knockout()
+        flash("✅ Knockout stage seeded successfully! (Check db-check)", "success")
+        return redirect(url_for("main.db_check"))   # or admin_knockout
+        
     except Exception as e:
-        return f"❌ Error: {str(e)}", 500
+        import traceback
+        error_msg = str(e)
+        full_trace = traceback.format_exc()
+        print("SEED ERROR:", full_trace)   # This will appear in Render Logs
+        flash(f"❌ Seeding failed: {error_msg}", "danger")
+        return f"""
+        <h2>Seeding Error</h2>
+        <pre>{full_trace}</pre>
+        <a href="/db-check">Back to DB Check</a>
+        """, 500
 
 @bp.route('/db-check')
 def db_check():
