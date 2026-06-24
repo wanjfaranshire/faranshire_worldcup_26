@@ -3,6 +3,7 @@
 {% block content %}
 <div class="text-center mb-4">
     <h1 class="display-4 fw-bold">My Bets</h1>
+    <h3 class="text-success">Current Points: <strong>{{ total_points }}</strong></h3>
 </div>
 
 <div class="container mb-5" id="mybets-date-container">
@@ -47,18 +48,21 @@
                             </div>
                         </div>
 
-                        {% if m.result or m.is_completed %}
+                        {% if m.result or (m.is_completed if is_knockout else False) %}
                             <!-- Finished Match -->
                             <div class="text-center mb-4">
                                 <h2 class="text-info mb-2" style="font-size: 2.8rem; font-weight: bold;">
                                     {{ m.result or (m.home_score ~ ' - ' ~ m.away_score) }}
                                 </h2>
-                                {% if m.home_penalty is not none and m.away_penalty is not none %}
+                                
+                                <!-- Penalty only for Knockout matches -->
+                                {% if is_knockout and m.home_penalty is not none and m.away_penalty is not none %}
                                     <div class="text-info" style="font-size: 1.45rem;">
                                         ({{ m.home_penalty }} - {{ m.away_penalty }})
                                     </div>
                                 {% endif %}
-                                <h6 class="text-warning">FINAL RESULT</h6>
+                                
+                                <h6 class="text-warning mt-2">FINAL RESULT</h6>
                             </div>
 
                             <div class="row g-2 justify-content-center align-items-center mb-4">
@@ -87,27 +91,27 @@
 
                         {% else %}
                             <!-- Active Bet -->
-                            {% set match_started = m.date.replace(tzinfo=None) < now.replace(tzinfo=None) if m.date else True %}
+                            {% set match_started = m.date and m.date.replace(tzinfo=None) < now.replace(tzinfo=None) %}
 
                             <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) if bet.match else url_for('main.place_bet_knockout', match_number=m.match_number if m.match_number is defined else m.id) }}">
                                 <div class="row g-2 justify-content-center align-items-center mb-3">
                                     <div class="col-5">
                                         <input type="number" name="home_score" class="form-control text-center" 
-                                               value="{{ bet.home_score }}" min="0" required disabled>
+                                               value="{{ bet.home_score }}" min="0" required {{ 'disabled' if match_started else '' }}>
                                     </div>
                                     <div class="col-1 text-center">
                                         <strong class="fs-4 text-warning">-</strong>
                                     </div>
                                     <div class="col-5">
                                         <input type="number" name="away_score" class="form-control text-center" 
-                                               value="{{ bet.away_score }}" min="0" required disabled>
+                                               value="{{ bet.away_score }}" min="0" required {{ 'disabled' if match_started else '' }}>
                                     </div>
                                 </div>
 
                                 <div class="mb-3">
                                     <label class="form-label text-light small">Stake (min 50 pts)</label>
                                     <input type="number" name="stake" class="form-control text-center" 
-                                           value="{{ bet.stake }}" min="50" required disabled>
+                                           value="{{ bet.stake }}" min="50" required {{ 'disabled' if match_started else '' }}>
                                 </div>
                             </form>
 
@@ -166,8 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 top: elementPosition - navbarHeight,
                 behavior: "smooth"
             });
-            
-            nextMatchCard.style.boxShadow = "0 0 20px rgba(255, 193, 7, 0.5)";
         }
     }, 500);
 });
