@@ -1026,13 +1026,13 @@ def knockout():
                            now=now_hkt())
 
 # ====================== KNOCKOUT STAGE BETTING ======================
-@bp.route("/place_bet_knockout/<int:match_id>", methods=["POST"])
+@bp.route("/place_bet_knockout/<int:match_number>", methods=["POST"])
 @login_required
-def place_bet_knockout(match_id):
+def place_bet_knockout(match_number):
     from datetime import timezone, timedelta
     current_utc = get_now_utc()
 
-    match = KnockoutMatch.query.get_or_404(match_id)
+    match = KnockoutMatch.query.filter_by(match_number=match_number).first_or_404()
 
     match_date = match.date
     if match_date.tzinfo is None:
@@ -1052,34 +1052,39 @@ def place_bet_knockout(match_id):
         new_stake = request.form.get("stake", type=int, default=50)
 
         if new_stake < 50 or home_score is None or away_score is None:
-            flash("Please enter valid scores and stake.", "danger")
+            flash("Please enter valid scores and stake (min 50).", "danger")
             return redirect(url_for("main.knockout"))
 
-        # Use match_number instead of id
-        knockout_match_number = match.match_number
+        if current_user.current_points < new_stake:
+            flash(f"Not enough points! You currently have {current_user.current_points} points.", "danger")
+            return redirect(url_for("main.knockout"))
 
         existing_bet = Bet.query.filter_by(
             user_id=current_user.id, 
-            match_id=knockout_match_number
+            knockout_match_number=match_number
         ).first()
 
         if existing_bet:
             old_stake = existing_bet.stake or 0
             difference = new_stake - old_stake
-            current_user.points += (old_stake - new_stake)
+
+            if difference > 0:
+                if current_user.current_points < difference:
+                    flash("Not enough points to increase stake!", "danger")
+                    return redirect(url_for("main.knockout"))
+                current_user.points -= difference
+            else:
+                current_user.points += abs(difference)
+
             existing_bet.home_score = home_score
             existing_bet.away_score = away_score
             existing_bet.stake = new_stake
         else:
-            if current_user.current_points < new_stake:
-                flash("Not enough points!", "danger")
-                return redirect(url_for("main.knockout"))
-
             current_user.points -= new_stake
 
             bet = Bet(
                 user_id=current_user.id,
-                match_id=knockout_match_number,   # ← Using match_number
+                knockout_match_number=match_number,
                 home_score=home_score,
                 away_score=away_score,
                 stake=new_stake,
@@ -1093,7 +1098,6 @@ def place_bet_knockout(match_id):
     except Exception as e:
         db.session.rollback()
         flash(f"❌ Failed to save bet: {str(e)}", "danger")
-        print(f"KNOCKOUT BET ERROR: {str(e)}")
 
     return redirect(url_for("main.knockout"))
 
@@ -1131,3 +1135,17 @@ def db_fix_bet_fk():
     except Exception as e:
         db.session.rollback()
         return f"<h2>Error</h2><pre>{str(e)}</pre>"
+
+
+@bp.route('/db-remove-fk')
+@login_required
+def db_remove_fk():
+    if not current_user.is_admin:
+        return "Admin only", 403
+    try:
+        db.session.execute(text("ALTER TABLE bet DROP CONSTRAINT IF EXISTS bet_match_id_fkey;"))
+        db.session.execute(text("ALTER TABLE bet ALTER COLUMN match_id DROP NOT NULL;"))
+        db.session.commit()
+        return "<h2>✅ Foreign Key Removed. You can now use match_id for knockout too.</h2>"
+    except Exception as e:
+        return f"Error: {e}"
