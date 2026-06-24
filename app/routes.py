@@ -1087,6 +1087,8 @@ def place_bet_knockout(match_id):
     return redirect(url_for("main.knockout"))
 
 
+from sqlalchemy import text
+
 @bp.route('/db-fix-bet-fk')
 @login_required
 def db_fix_bet_fk():
@@ -1094,23 +1096,27 @@ def db_fix_bet_fk():
         return "Admin only", 403
     
     try:
-        # Drop the foreign key constraint so we can insert knockout match_numbers
-        db.engine.execute("""
+        # Drop the foreign key constraint
+        db.session.execute(text("""
             ALTER TABLE bet 
             DROP CONSTRAINT IF EXISTS bet_match_id_fkey;
-        """)
+        """))
         
-        # Make sure match_id can be null (in case it isn't already)
-        db.engine.execute("""
+        # Allow match_id to be NULL
+        db.session.execute(text("""
             ALTER TABLE bet 
             ALTER COLUMN match_id DROP NOT NULL;
-        """)
+        """))
         
         db.session.commit()
+        
         return """
-        <h2>✅ Foreign Key Constraint Removed</h2>
-        <p>PostgreSQL will now accept knockout match numbers in the bet table.</p>
-        <p><a href="/seed-knockout">→ Run Knockout Seeder Again</a></p>
+        <h2>✅ Success!</h2>
+        <p>Foreign key constraint removed.</p>
+        <p>PostgreSQL will now accept knockout match numbers.</p>
+        <br>
+        <a href="/seed-knockout" class="btn btn-success">→ Run Knockout Seeder Now</a>
         """
     except Exception as e:
-        return f"Error: {str(e)}"
+        db.session.rollback()
+        return f"<h2>Error</h2><pre>{str(e)}</pre>"
