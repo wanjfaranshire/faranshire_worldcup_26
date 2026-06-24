@@ -1085,3 +1085,32 @@ def place_bet_knockout(match_id):
         print(f"KNOCKOUT BET ERROR: {str(e)}")
 
     return redirect(url_for("main.knockout"))
+
+
+@bp.route('/db-fix-bet-fk')
+@login_required
+def db_fix_bet_fk():
+    if not current_user.is_admin:
+        return "Admin only", 403
+    
+    try:
+        # Drop the foreign key constraint so we can insert knockout match_numbers
+        db.engine.execute("""
+            ALTER TABLE bet 
+            DROP CONSTRAINT IF EXISTS bet_match_id_fkey;
+        """)
+        
+        # Make sure match_id can be null (in case it isn't already)
+        db.engine.execute("""
+            ALTER TABLE bet 
+            ALTER COLUMN match_id DROP NOT NULL;
+        """)
+        
+        db.session.commit()
+        return """
+        <h2>✅ Foreign Key Constraint Removed</h2>
+        <p>PostgreSQL will now accept knockout match numbers in the bet table.</p>
+        <p><a href="/seed-knockout">→ Run Knockout Seeder Again</a></p>
+        """
+    except Exception as e:
+        return f"Error: {str(e)}"
