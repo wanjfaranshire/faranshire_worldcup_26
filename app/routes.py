@@ -890,21 +890,33 @@ def update_knockout_result(match_id):
     if not current_user.is_admin:
         flash("Admin access required.", "danger")
         return redirect(url_for('main.admin_knockout'))
-    
+   
     match = KnockoutMatch.query.get_or_404(match_id)
-    
+   
     match.home_score = request.form.get('home_score', type=int)
     match.away_score = request.form.get('away_score', type=int)
     match.home_penalty = request.form.get('home_penalty', type=int)
     match.away_penalty = request.form.get('away_penalty', type=int)
-    
+   
     winner = match.calculate_winner()
-    
+   
     if winner:
         match.is_completed = True
         match.winner = winner
         match.winner_code = match.team1_code if winner == match.team1 else match.team2_code
+       
+        # === CALCULATE AND AWARD POINTS TO BETTORS ===
+        # Use match_number because that's what we store in Bet for knockout
+        bets = Bet.query.filter_by(match_id=match.match_number).all()
         
+        for bet in bets:
+            if bet.home_score is not None and bet.away_score is not None:
+                bet.points = match.calculate_knockout_points(
+                    bet.home_score, 
+                    bet.away_score, 
+                    bet.stake
+                )
+
         # === NORMAL BRACKET ADVANCE ===
         if match.next_match_id:
             next_match = KnockoutMatch.query.filter_by(match_number=match.next_match_id).first()
@@ -915,32 +927,31 @@ def update_knockout_result(match_id):
                 else:
                     next_match.team2 = winner
                     next_match.team2_code = match.winner_code
-        
+       
         # === THIRD PLACE PLAY-OFF LOGIC (M103) ===
         if match.round_name.lower() == "semifinal":
             loser = match.team1 if winner == match.team2 else match.team2
             loser_code = match.team1_code if winner == match.team2 else match.team2_code
-            
+           
             third_place = KnockoutMatch.query.filter_by(match_number=103).first()
             if third_place:
-                if match.match_number == 101:   # Loser of M101 → Home in M103
+                if match.match_number == 101: # Loser of M101 → Home in M103
                     third_place.team1 = loser
                     third_place.team1_code = loser_code
                 elif match.match_number == 102: # Loser of M102 → Away in M103
                     third_place.team2 = loser
                     third_place.team2_code = loser_code
-                
-                flash(f"Result saved. {winner} advanced. Loser {loser} to Third Place Play-off.", "success")
+               
+                flash(f"Result saved. {winner} advanced. Loser {loser} to Third Place Play-off. Points awarded.", "success")
             else:
-                flash(f"Result saved. Winner: {winner}", "success")
+                flash(f"Result saved. Winner: {winner}. Points awarded.", "success")
         else:
-            flash(f"Result saved. Winner: {winner}", "success")
+            flash(f"Result saved. Winner: {winner}. Points awarded to bettors.", "success")
     else:
         flash("Result saved (incomplete).", "warning")
-    
+   
     db.session.commit()
     return redirect(url_for('main.admin_knockout'))
-
 
 @bp.route('/admin/knockout/debug')
 @login_required
