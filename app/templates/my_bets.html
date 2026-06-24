@@ -89,7 +89,7 @@
                             <!-- Active Bet -->
                             {% set match_started = m.date.replace(tzinfo=None) < now.replace(tzinfo=None) if m.date else True %}
 
-                            <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) if bet.match else url_for('main.place_bet_knockout', match_id=m.id) }}">
+                            <form method="POST" action="{{ url_for('main.place_bet', match_id=bet.match.id) if bet.match else url_for('main.place_bet_knockout', match_number=m.match_number if m.match_number is defined else m.id) }}">
                                 <div class="row g-2 justify-content-center align-items-center mb-3">
                                     <div class="col-5">
                                         <input type="number" name="home_score" class="form-control text-center" 
@@ -136,9 +136,6 @@
 <!-- Smart Auto Scroll -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Optional: Remove or adjust the view=time check if you want it to always run
-    // if (!window.location.search.includes('view=time')) return;
-
     setTimeout(() => {
         const now = new Date();
         let nextMatchCard = null;
@@ -151,13 +148,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!timeStr) return;
 
             const matchTime = new Date(timeStr);
-            
-            // Validate the date
             if (isNaN(matchTime.getTime())) return;
 
             const timeDiff = matchTime - now;
 
-            // Look for the first upcoming match
             if (timeDiff > 0 && timeDiff < closestTimeDiff) {
                 closestTimeDiff = timeDiff;
                 nextMatchCard = card;
@@ -165,7 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (nextMatchCard) {
-            // Add a slight offset to ensure the card isn't hidden under the navbar
             const navbarHeight = 160; 
             const elementPosition = nextMatchCard.getBoundingClientRect().top + window.scrollY;
             
@@ -174,10 +167,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 behavior: "smooth"
             });
             
-            // Optional: Highlight the card
             nextMatchCard.style.boxShadow = "0 0 20px rgba(255, 193, 7, 0.5)";
         }
-    }, 500); // Reduced delay slightly
+    }, 500);
 });
 </script>
 

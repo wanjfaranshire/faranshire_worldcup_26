@@ -1055,36 +1055,42 @@ def place_bet_knockout(match_number):
             flash("Please enter valid scores and stake (min 50).", "danger")
             return redirect(url_for("main.knockout"))
 
+        # Strict balance check
         if current_user.current_points < new_stake:
             flash(f"Not enough points! You currently have {current_user.current_points} points.", "danger")
             return redirect(url_for("main.knockout"))
 
+        # Use match_id = match_number for knockout bets
         existing_bet = Bet.query.filter_by(
             user_id=current_user.id, 
-            knockout_match_number=match_number
+            match_id=match_number
         ).first()
 
         if existing_bet:
+            # Update existing bet
             old_stake = existing_bet.stake or 0
             difference = new_stake - old_stake
 
             if difference > 0:
+                # Increasing stake
                 if current_user.current_points < difference:
                     flash("Not enough points to increase stake!", "danger")
                     return redirect(url_for("main.knockout"))
                 current_user.points -= difference
             else:
+                # Decreasing stake → refund
                 current_user.points += abs(difference)
 
             existing_bet.home_score = home_score
             existing_bet.away_score = away_score
             existing_bet.stake = new_stake
         else:
+            # New bet
             current_user.points -= new_stake
 
             bet = Bet(
                 user_id=current_user.id,
-                knockout_match_number=match_number,
+                match_id=match_number,          # ← Using match_number as match_id
                 home_score=home_score,
                 away_score=away_score,
                 stake=new_stake,
@@ -1098,6 +1104,7 @@ def place_bet_knockout(match_number):
     except Exception as e:
         db.session.rollback()
         flash(f"❌ Failed to save bet: {str(e)}", "danger")
+        print(f"KNOCKOUT BET ERROR: {str(e)}")
 
     return redirect(url_for("main.knockout"))
 
