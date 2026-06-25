@@ -73,7 +73,7 @@
                                     </button>
                                 {% else %}
                                     <button type="button" class="btn btn-secondary w-100 mt-4" disabled>
-                                        TBD
+                                        Teams Not Fully Assigned
                                     </button>
                                 {% endif %}
                             </form>
@@ -83,9 +83,12 @@
                 {% endfor %}
             </div>
         </div>
+
         <!-- ROUND OF 32 SETUP TAB -->
         <div class="tab-pane fade" id="setup">
             <h4 class="text-warning mb-3">Round of 32 - Team Assignment</h4>
+            <p class="text-muted mb-4">You can update <strong>one team at a time</strong>. Leave the other as "No Change".</p>
+            
             <div class="row">
                 {% for match in round32_matches %}
                 <div class="col-lg-6 mb-4">
@@ -99,45 +102,46 @@
                         <div class="card-body">
                             <form method="POST" action="{{ url_for('main.update_knockout_team', match_id=match.id) }}">
                                 <div class="row g-3">
+                                    <!-- Home Team -->
                                     <div class="col-6">
                                         <label class="form-label text-light small">
                                             Home Team <span class="text-info">({{ match.home_placeholder or 'TBD' }})</span>
                                         </label>
                                         <select name="team1" class="form-select bg-dark text-white">
-                                            <option value="">-- Select --</option>
+                                            <option value="">-- No Change --</option>
                                             {% for team in all_teams %}
                                             <option value="{{ team }}" 
-                                                    {{ 'selected' if match.team1 == team else '' }}
-                                                    {% if team in used_teams and team != match.team1 %}disabled{% endif %}>
+                                                    {{ 'selected' if match.team1 == team else '' }}>
                                                 {{ team }}
                                             </option>
                                             {% endfor %}
                                         </select>
                                     </div>
+
+                                    <!-- Away Team -->
                                     <div class="col-6">
                                         <label class="form-label text-light small">
                                             Away Team <span class="text-info">({{ match.away_placeholder or 'TBD' }})</span>
                                         </label>
                                         <select name="team2" class="form-select bg-dark text-white">
-                                            <option value="">-- Select --</option>
+                                            <option value="">-- No Change --</option>
                                             {% for team in all_teams %}
                                             <option value="{{ team }}" 
-                                                    {{ 'selected' if match.team2 == team else '' }}
-                                                    {% if team in used_teams and team != match.team2 %}disabled{% endif %}>
+                                                    {{ 'selected' if match.team2 == team else '' }}>
                                                 {{ team }}
                                             </option>
                                             {% endfor %}
                                         </select>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100 mt-3">Save Teams</button>
+                                <button type="submit" class="btn btn-primary w-100 mt-3">Update Team(s)</button>
                             </form>
 
                             {% if match.team1 or match.team2 %}
                                 <form method="POST" action="{{ url_for('main.clear_knockout_teams', match_id=match.id) }}" class="mt-2">
                                     <button type="submit" class="btn btn-outline-danger w-100"
-                                            onclick="return confirm('Clear teams for this match?')">
-                                        Clear Teams
+                                            onclick="return confirm('Clear both teams for this match and cascade downstream?')">
+                                        Clear Both Teams
                                     </button>
                                 </form>
                             {% endif %}

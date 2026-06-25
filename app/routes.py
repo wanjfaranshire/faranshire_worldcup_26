@@ -805,46 +805,51 @@ def admin_knockout():
 @bp.route('/admin/knockout/update_team/<int:match_id>', methods=['POST'])
 @login_required
 def update_knockout_team(match_id):
-    """1. Update teams in Round of 32"""
+    """Update one or both teams in Round of 32"""
     if not current_user.is_admin:
         flash("Admin access required.", "danger")
         return redirect(url_for('main.admin_knockout'))
-    
+   
     match = KnockoutMatch.query.get_or_404(match_id)
-    
+   
     team1 = request.form.get('team1', '').strip()
     team2 = request.form.get('team2', '').strip()
-    
-    if not team1 or not team2:
-        flash("Both teams are required.", "danger")
+   
+    # At least one team must be selected
+    if not team1 and not team2:
+        flash("Please select at least one team to update.", "danger")
         return redirect(url_for('main.admin_knockout'))
-    
-    if team1 == team2:
+   
+    # Check if user is trying to set the same team for both sides
+    if team1 and team2 and team1 == team2:
         flash("Cannot select the same team for both sides.", "danger")
         return redirect(url_for('main.admin_knockout'))
-    
-    # Check duplicate across Round of 32
+   
+    # Check duplicate across Round of 32 (only for teams being changed)
     existing = KnockoutMatch.query.filter(
         KnockoutMatch.round_name.ilike("round of 32"),
         KnockoutMatch.id != match_id
     ).all()
-    
+   
     used = set()
     for m in existing:
         if m.team1: used.add(m.team1)
         if m.team2: used.add(m.team2)
-    
-    if team1 in used or team2 in used:
+   
+    if team1 and team1 in used:
         flash("This team is already assigned to another Round of 32 match.", "danger")
         return redirect(url_for('main.admin_knockout'))
-    
-    # === UPDATE ===
-    match.team1 = team1
-    match.team2 = team2
-    # Optional: set codes if you have a mapping
-    # match.team1_code = get_team_code(team1)
-    # match.team2_code = get_team_code(team2)
-    
+   
+    if team2 and team2 in used:
+        flash("This team is already assigned to another Round of 32 match.", "danger")
+        return redirect(url_for('main.admin_knockout'))
+   
+    # === UPDATE ONLY THE TEAMS THAT WERE SELECTED ===
+    if team1:
+        match.team1 = team1
+    if team2:
+        match.team2 = team2
+   
     db.session.commit()
     flash(f"Teams updated for Match {match.match_number}", "success")
     return redirect(url_for('main.admin_knockout'))
