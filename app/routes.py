@@ -466,7 +466,7 @@ def profile():
         return (group_order.get(group_val, 99), date_val)
 
     group_history.sort(key=group_sort_key)
-    knockout_history.sort(key=lambda b: b.match_id or 0, reverse=True)
+    knockout_history.sort(key=lambda b: b.match_id or 0, reverse=False)
 
     knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
 
@@ -574,7 +574,7 @@ def user_profile_api(user_id):
     losses = 0
 
     for bet in all_bets:
-        # 1. Group Stage Logic
+        # Group Stage
         if bet.match and bet.match.result is not None:
             outcome = "WIN" if (bet.points and bet.points > 0) else "LOSE"
             if outcome == "WIN": wins += 1
@@ -582,14 +582,14 @@ def user_profile_api(user_id):
             
             group_history.append({
                 "group": bet.match.group,
-                "date": bet.match.date, # Keep for sorting
+                "date": bet.match.date,
                 "match": f"{bet.match.team1} vs {bet.match.team2}",
                 "your_bet": f"{bet.home_score} - {bet.away_score}",
                 "match_result": bet.match.result,
                 "outcome": outcome
             })
 
-        # 2. Knockout Stage Logic
+        # Knockout Stage
         elif bet.match_id in knockout_map and knockout_map[bet.match_id].is_completed:
             km = knockout_map[bet.match_id]
             outcome = "WIN" if (bet.points and bet.points > 0) else "LOSE"
@@ -601,7 +601,7 @@ def user_profile_api(user_id):
                 penalty_str = f" ({km.home_penalty} - {km.away_penalty})"
 
             knockout_history.append({
-                "match_id": km.match_number, # Keep for sorting
+                "match_id": km.match_number,
                 "round": km.round_name,
                 "match": f"{km.team1 or 'TBD'} vs {km.team2 or 'TBD'}",
                 "your_bet": f"{bet.home_score} - {bet.away_score}",
@@ -609,14 +609,71 @@ def user_profile_api(user_id):
                 "outcome": outcome
             })
 
-    # === Apply Sorting to match profile.html logic ===
-    
-    # Sort Group: by Group (A-L) then by Date
-    group_order = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,'K':10,'L':11}
-    group_history.sort(key=lambda x: (group_order.get(x['group'], 99), x['date']))
+    # === WIN RATE CALCULATION ===
+    total_played = wins + losses
+    win_rate = 0
+    if total_played > 0:
+        win_rate = round((wins / total_played) * 100, 1)
 
-    # Sort Knockout: newest match_id first
-    knockout_history.sort(key=lambda x: x['match_id'], reverse=True)
+    # === POINTS HISTORY (Grouped by Date) ===
+    import json
+    from datetime import datetime
+    from collections import defaultdict
+
+    points_history = []
+    current_points = 1000
+
+    # Bonuses
+    if getattr(user, 'bonus_claimed', False): current_points += 1000
+    if getattr(user, 'bread_bonus_claimed', False): current_points += 500
+    if getattr(user, 'pancake_bonus_claimed', False): current_points += 200
+    if getattr(user, 'lomo_bonus_claimed', False): current_points += 300
+
+    points_history.append({
+        "date": "Start",
+        "points": current_points,
+        "tooltip": "Starting Points + Bonuses"
+    })
+
+    # Group by date
+    daily_results = defaultdict(list)
+
+    sorted_bets = sorted(all_bets, key=lambda b: 
+        (b.match.date if b.match and b.match.date else 
+         (knockout_map.get(b.match_id).date if knockout_map.get(b.match_id) else datetime.min)))
+
+    for bet in sorted_bets:
+        if (bet.match and bet.match.result is not None) or (not bet.match and knockout_map.get(bet.match_id) and knockout_map.get(bet.match_id).is_completed):
+            stake = bet.stake or 50
+            net = (bet.points or 0) - stake
+
+            if bet.match:
+                match_name = f"{bet.match.team1} vs {bet.match.team2}"
+            else:
+                km = knockout_map.get(bet.match_id)
+                match_name = f"{km.team1 or 'TBD'} vs {km.team2 or 'TBD'}" if km else f"Knockout {bet.match_id}"
+
+            date_str = (bet.match.date.strftime('%Y-%m-%d') if bet.match and bet.match.date else 
+                       (knockout_map.get(bet.match_id).date.strftime('%Y-%m-%d') if knockout_map.get(bet.match_id) else "Unknown"))
+            
+            daily_results[date_str].append({
+                "match": match_name,
+                "net": net
+            })
+
+    # One point per date
+    for date_str in sorted(daily_results.keys()):
+        actions = daily_results[date_str]
+        daily_net = sum(a['net'] for a in actions)
+        current_points += daily_net
+
+        tooltip_lines = [f"{a['match']} {'+' if a['net'] > 0 else ''}{a['net']}" for a in actions]
+
+        points_history.append({
+            "date": date_str,
+            "points": current_points,
+            "tooltip": "\n".join(tooltip_lines)
+        })
 
     data = {
         "username": user.username,
@@ -628,12 +685,12 @@ def user_profile_api(user_id):
         "favourite_team": user.favourite_team,
         "favourite_food": user.favourite_food,
         "total_points": user.current_points,
-        # ADD THESE TWO LINES:
         "wins": wins,
         "losses": losses,
-        # -------------------
+        "winRate": win_rate,                    # ← Fixed
         "group_history": group_history,
-        "knockout_history": knockout_history
+        "knockout_history": knockout_history,
+        "points_history": points_history
     }
     return jsonify(data)
 
@@ -1086,7 +1143,7 @@ def knockout():
         round_name = match.round_name.strip()
         knockout_by_round[round_name].append(match)
         
-        # Group by date for "By Date" view
+        # Group by date
         day = match.date.date()
         knockout_by_day[day].append(match)
 
@@ -1099,6 +1156,7 @@ def knockout():
                            knockout_by_day=knockout_by_day,
                            Bet=Bet,
                            now=now_hkt())
+
 
 # ====================== KNOCKOUT STAGE BETTING ======================
 @bp.route("/place_bet_knockout/<int:match_number>", methods=["POST"])

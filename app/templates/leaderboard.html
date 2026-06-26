@@ -8,11 +8,19 @@
     .semifinal { background-color: #ff00ff !important; color: white !important; }
     .final { background-color: #ffd700 !important; color: #000 !important; }
     .third { background-color: #ffd700 !important; color: #000 !important; }
+
+    /* Group Stage Colors - Same as Profile */
+    .group-A { background-color: #0d6efd !important; } /* Primary */
+    .group-B { background-color: #198754 !important; } /* Success */
+    .group-C { background-color: #dc3545 !important; } /* Danger */
+    .group-D { background-color: #ffc107 !important; color: #000 !important; }
+    .group-E { background-color: #0dcaf0 !important; color: #000 !important; }
+    .group-F, .group-L { background-color: #6c757d !important; }
 </style>
+
 <div class="container py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8 col-xl-7">   <!-- Controls the width -->
-
+        <div class="col-lg-8 col-xl-7">
             <h1 class="mb-4 text-white">Leaderboard</h1>
 
             <div class="card bg-dark border-secondary shadow">
@@ -46,16 +54,25 @@
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
 
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
+let currentChart = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const modal = new bootstrap.Modal(document.getElementById('userProfileModal'));
+
+    document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', function () {
+        if (currentChart) {
+            currentChart.destroy();
+            currentChart = null;
+        }
+    });
 
     document.querySelectorAll('.user-row').forEach(row => {
         row.addEventListener('click', function() {
@@ -64,21 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             fetch(`/api/user_profile/${userId}`)
                 .then(response => response.json())
                 .then(data => {
-                    // 1. Calculate stats from the fetched data
-                    const groupHistory = data.group_history || [];
-                    const knockoutHistory = data.knockout_history || [];
-                    const allMatches = [...groupHistory, ...knockoutHistory];
-                    
-                    const totalWins = allMatches.filter(m => m.outcome === 'WIN').length;
-                    const totalLosses = allMatches.filter(m => m.outcome === 'LOSE').length;
-                    const totalPlayed = totalWins + totalLosses;
-
-                    let winRate = 0;
-                    if (totalPlayed > 0) {
-                        winRate = ((totalWins / totalPlayed) * 100).toFixed(1); 
-                    }
-                    // Fill basic profile info
-                    // Fill modal content
                     document.getElementById('modalUsername').textContent = data.username;
                     document.getElementById('modalNickname').textContent = data.nickname || '-';
                     document.getElementById('modalBirthday').textContent = data.birthday || '-';
@@ -88,37 +90,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('modalTeam').textContent = data.favourite_team || '-';
                     document.getElementById('modalFood').textContent = data.favourite_food || '-';
                     document.getElementById('modalPoints').textContent = data.total_points;
-                    document.getElementById('modalWins').textContent = data.wins;
-                    document.getElementById('modalLosses').textContent = data.losses;
-                    document.getElementById('modalWinRate').textContent = winRate;
 
-                    // === Betting History Table ===
+                    document.getElementById('modalWins').textContent = data.wins || 0;
+                    document.getElementById('modalLosses').textContent = data.losses || 0;
+                    document.getElementById('modalWinRate').textContent = (data.winRate || 0) + '%';
+
+                    // Betting History
                     const historyContainer = document.getElementById('modalHistory');
                     historyContainer.innerHTML = '';
 
-                    // Helper for row generation
                     const generateRow = (item, type) => {
-                    // Determine Badge Class
                         let badgeClass = 'bg-secondary';
                         if (type === 'group') {
-                            const groupColors = { 'A': 'bg-primary', 'B': 'bg-success', 'C': 'bg-danger', 'D': 'bg-warning text-dark', 'E': 'bg-info text-dark', 'F': 'bg-secondary', 'G': 'bg-primary', 'H': 'bg-success', 'I': 'bg-danger', 'J': 'bg-warning text-dark', 'K': 'bg-info text-dark', 'L': 'bg-secondary' };
-                            badgeClass = groupColors[item.group] || 'bg-dark';
+                            const g = item.group;
+                            if (g === 'A') badgeClass = 'bg-primary';
+                            else if (g === 'B') badgeClass = 'bg-success';
+                            else if (g === 'C') badgeClass = 'bg-danger';
+                            else if (g === 'D') badgeClass = 'bg-warning text-dark';
+                            else if (g === 'E') badgeClass = 'bg-info text-dark';
+                            else if (g === 'F') badgeClass = 'bg-secondary';
+                            else if (g === 'G') badgeClass = 'bg-primary';
+                            else if (g === 'H') badgeClass = 'bg-success';
+                            else if (g === 'I') badgeClass = 'bg-danger';
+                            else if (g === 'J') badgeClass = 'bg-warning text-dark';
+                            else if (g === 'K') badgeClass = 'bg-info text-dark';
+                            else if (g === 'L') badgeClass = 'bg-secondary';
+                            else badgeClass = 'bg-secondary';
                         } else if (type === 'knockout') {
-                            const roundName = item.round.toLowerCase();
+                            const roundName = (item.round || '').toLowerCase();
                             if (roundName.includes('32')) badgeClass = 'round-32';
                             else if (roundName.includes('16')) badgeClass = 'round-16';
                             else if (roundName.includes('quarter')) badgeClass = 'quarterfinal';
                             else if (roundName.includes('semi')) badgeClass = 'semifinal';
-                            else if (roundName.includes('third')) badgeClass = 'third';
-                            else if (roundName.includes('final')) badgeClass = 'final';
-                        }
-
-                        let displayResult = item.match_result;
-                        if (displayResult.includes('(')) {
-                            // Split at the '(' to separate score and penalty
-                            const parts = displayResult.split('(');
-                            // Join them with a <br> instead of a space
-                            displayResult = `${parts[0]}<br><small class="text-info">(${parts[1]}</small>`;
+                            else if (roundName.includes('final') || roundName.includes('third')) badgeClass = 'final';
                         }
 
                         const outcomeBadge = item.outcome === 'WIN' 
@@ -130,23 +134,24 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td class="text-center"><span class="badge ${badgeClass}">${type === 'group' ? item.group : item.round}</span></td>
                                 <td><strong>${item.match}</strong></td>
                                 <td class="text-center">${item.your_bet}</td>
-                                <td class="text-center align-middle text-info"><strong>${displayResult}</strong></td>
+                                <td class="text-center text-info">${item.match_result}</td>
                                 <td class="text-center">${outcomeBadge}</td>
                             </tr>`;
                     };
 
-                    // 1. Group Stage Table
+                    // Group Stage Table
                     if (data.group_history && data.group_history.length > 0) {
-                        historyContainer.innerHTML += `<h6 class="text-info mt-3">Group Stage</h6>
+                        historyContainer.innerHTML += `
+                            <h6 class="text-info mt-3">Group Stage</h6>
                             <div class="table-responsive">
-                                <table class="table table-dark table-sm table-bordered align-middle" style="table-layout: fixed; width: 100%;">
+                                <table class="table table-dark table-sm table-bordered" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-secondary text-dark">
                                         <tr>
                                             <th style="width: 70px;">Group</th>
                                             <th>Match</th>
-                                            <th style="width: 100px;">Their Bet</th>
-                                            <th style="width: 100px;">Result</th>
-                                            <th style="width: 80px;">Outcome</th>
+                                            <th style="width: 110px;">Their Bet</th>
+                                            <th style="width: 130px;">Result</th>
+                                            <th style="width: 90px;">Outcome</th>
                                         </tr>
                                     </thead>
                                     <tbody>${data.group_history.map(item => generateRow(item, 'group')).join('')}</tbody>
@@ -154,18 +159,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>`;
                     }
 
-                    // 2. Knockout Stage Table
+                    // Knockout Stage Table
                     if (data.knockout_history && data.knockout_history.length > 0) {
-                        historyContainer.innerHTML += `<h6 class="text-warning mt-3">Knockout Stage</h6>
+                        historyContainer.innerHTML += `
+                            <h6 class="text-warning mt-3">Knockout Stage</h6>
                             <div class="table-responsive">
-                                <table class="table table-dark table-sm table-bordered align-middle" style="table-layout: fixed; width: 100%;">
+                                <table class="table table-dark table-sm table-bordered" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-secondary text-dark">
                                         <tr>
                                             <th style="width: 110px;">Round</th>
                                             <th>Match</th>
-                                            <th style="width: 100px;">Their Bet</th>
-                                            <th style="width: 100px;">Result</th>
-                                            <th style="width: 80px;">Outcome</th>
+                                            <th style="width: 110px;">Their Bet</th>
+                                            <th style="width: 140px;">Result</th>
+                                            <th style="width: 90px;">Outcome</th>
                                         </tr>
                                     </thead>
                                     <tbody>${data.knockout_history.map(item => generateRow(item, 'knockout')).join('')}</tbody>
@@ -173,8 +179,45 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>`;
                     }
 
-                    if (data.group_history.length === 0 && data.knockout_history.length === 0) {
-                        historyContainer.innerHTML = '<p class="text-muted mb-0">No completed bets yet.</p>';
+                    // Points History Graph
+                    const chartCanvas = document.getElementById('modalPointsChart');
+                    if (chartCanvas) {
+                        if (currentChart) currentChart.destroy();
+
+                        currentChart = new Chart(chartCanvas, {
+                            type: 'line',
+                            data: {
+                                labels: data.points_history ? data.points_history.map(item => item.date) : [],
+                                datasets: [{
+                                    label: 'Points',
+                                    data: data.points_history ? data.points_history.map(item => item.points) : [],
+                                    borderColor: '#00ff80',
+                                    backgroundColor: 'rgba(0, 255, 128, 0.1)',
+                                    tension: 0.3,
+                                    borderWidth: 3,
+                                    pointRadius: 4,
+                                    pointBackgroundColor: '#ffd700'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const item = data.points_history[context.dataIndex];
+                                                return item.tooltip ? item.tooltip.split('\n') : context.raw + " points";
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: { min: 0, grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                                    x: { grid: { color: '#333' }, ticks: { color: '#aaa' } }
+                                }
+                            }
+                        });
                     }
 
                     modal.show();
@@ -187,4 +230,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
 {% endblock %}

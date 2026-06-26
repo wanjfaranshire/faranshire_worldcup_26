@@ -645,9 +645,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <!-- Bets Placed Counter -->
         <div class="text-center mb-3">
+            {% set bet_count = Bet.query.filter_by(match_id=match.match_number).count() %}
             <small class="text-info">
                 <i class="fas fa-users me-1"></i>
-                {{ match.bets|length if match.bets is defined else 0 }} bets placed
+                {{ bet_count }} bet{{ 's' if bet_count != 1 else '' }} placed
             </small>
         </div>
 
