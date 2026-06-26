@@ -470,7 +470,7 @@ def profile():
 
     knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
 
-        # ====================== CORRECT POINTS HISTORY ======================
+        # ====================== FINAL POINTS HISTORY ======================
     import json
     from datetime import datetime
     from collections import defaultdict
@@ -501,7 +501,7 @@ def profile():
         "tooltip": f"Starting Points{bonus_desc} (+{bonus_total})"
     })
 
-    # Group by date - include ALL finished bets (win or lose)
+    # Group by date
     daily_results = defaultdict(list)
 
     sorted_bets = sorted(all_bets, key=lambda b: 
@@ -511,11 +511,11 @@ def profile():
     for bet in sorted_bets:
         # Check if match is finished
         is_finished = False
-        if bet.match and bet.match.result is not None:
+        if bet.match and getattr(bet.match, 'result', None) is not None:
             is_finished = True
         elif not bet.match:
             km = knockout_matches.get(bet.match_id)
-            if km and km.is_completed:
+            if km and getattr(km, 'is_completed', False):
                 is_finished = True
 
         if is_finished:
@@ -536,12 +536,13 @@ def profile():
                 "net": net
             })
 
-    # Build graph points
+    # Build graph - one point per date
     for date_str in sorted(daily_results.keys()):
         actions = daily_results[date_str]
         daily_net = sum(a['net'] for a in actions)
         current_points += daily_net
 
+        # One line per match
         tooltip_lines = [f"{a['match']} {'+' if a['net'] > 0 else ''}{a['net']}" for a in actions]
 
         points_history.append({

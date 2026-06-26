@@ -309,20 +309,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         label: function(context) {
                             const item = rawData[context.dataIndex];
-                            return item.tooltip || (context.raw + " points");
+                            if (item.tooltip) {
+                                // Split into array for multi-line tooltip
+                                return item.tooltip.split('\n');
+                            }
+                            return context.raw + " points";
                         }
                     }
                 }
             },
             scales: {
                 y: { 
-                    min: 0,           // ← Force Y-axis to start at 0
+                    min: 0,
                     grid: { color: '#333' },
                     ticks: { color: '#aaa' }
                 },
                 x: { 
                     grid: { color: '#333' },
-                    ticks: { color: '#aaa', maxTicksLimit: 12 }
+                    ticks: { color: '#aaa', maxTicksLimit: 15 }
                 }
             }
         }
