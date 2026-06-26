@@ -278,10 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const rawData = {{ points_history | safe }};
-    if (!rawData || rawData.length === 0) {
-        console.log("No points history data");
-        return;
-    }
+    if (!rawData || rawData.length === 0) return;
 
     const labels = rawData.map(item => item.date);
     const points = rawData.map(item => item.points);
@@ -312,16 +309,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         label: function(context) {
                             const item = rawData[context.dataIndex];
-                            if (item.tooltip) {
-                                return item.tooltip.split('\n');
-                            }
-                            return context.raw + " points";
+                            return item.tooltip || (context.raw + " points");
                         }
                     }
                 }
             },
             scales: {
                 y: { 
+                    min: 0,           // ← Force Y-axis to start at 0
                     grid: { color: '#333' },
                     ticks: { color: '#aaa' }
                 },

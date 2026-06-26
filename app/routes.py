@@ -470,15 +470,15 @@ def profile():
 
     knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
 
-        # ====================== ACCURATE POINTS HISTORY FOR GRAPH ======================
+        # ====================== CORRECT POINTS HISTORY ======================
     import json
     from datetime import datetime
     from collections import defaultdict
 
     points_history = []
-    current_points = 1000  # Starting points
+    current_points = 1000
 
-    # Starting point with all bonuses
+    # Starting point + bonuses
     bonus_total = 0
     bonus_desc = ""
     if getattr(current_user, 'bonus_claimed', False):
@@ -501,7 +501,7 @@ def profile():
         "tooltip": f"Starting Points{bonus_desc} (+{bonus_total})"
     })
 
-    # Group results by date for cleaner display
+    # Group by date - include ALL finished bets (win or lose)
     daily_results = defaultdict(list)
 
     sorted_bets = sorted(all_bets, key=lambda b: 
@@ -509,11 +509,19 @@ def profile():
          (knockout_matches.get(b.match_id).date if knockout_matches.get(b.match_id) else datetime.min)))
 
     for bet in sorted_bets:
-        if bet.points and bet.points > 0:   # Only when result is settled
-            stake = bet.stake or 50
-            net = bet.points - stake
+        # Check if match is finished
+        is_finished = False
+        if bet.match and bet.match.result is not None:
+            is_finished = True
+        elif not bet.match:
+            km = knockout_matches.get(bet.match_id)
+            if km and km.is_completed:
+                is_finished = True
 
-            # Get match name
+        if is_finished:
+            stake = bet.stake or 50
+            net = (bet.points or 0) - stake
+
             if bet.match:
                 match_name = f"{bet.match.team1} vs {bet.match.team2}"
             else:
@@ -528,13 +536,13 @@ def profile():
                 "net": net
             })
 
-    # Build final history with correct cumulative points
-    for date_str, matches in sorted(daily_results.items()):
-        tooltip_lines = [f"{m['match']} {'+' if m['net'] > 0 else ''}{m['net']}" for m in matches]
-        
-        # Update running total
-        for m in matches:
-            current_points += m['net']
+    # Build graph points
+    for date_str in sorted(daily_results.keys()):
+        actions = daily_results[date_str]
+        daily_net = sum(a['net'] for a in actions)
+        current_points += daily_net
+
+        tooltip_lines = [f"{a['match']} {'+' if a['net'] > 0 else ''}{a['net']}" for a in actions]
 
         points_history.append({
             "date": date_str,
