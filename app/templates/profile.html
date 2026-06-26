@@ -235,7 +235,17 @@
 
         </div>
     </div>
+    <!-- Points History Graph -->
+            <h5 class="text-info mb-3 mt-5">Your Points History</h5>
+            <div class="card bg-dark border-secondary mb-5">
+                <div class="card-body">
+                    <canvas id="pointsChart" height="140"></canvas>
+                </div>
+            </div>
 </div>
+
+
+
 
 <!-- Easter Eggs (unchanged) -->
 {% if current_user.is_authenticated and not current_user.pancake_bonus_claimed %}
@@ -263,5 +273,66 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rawData = {{ points_history | safe }};
+    if (!rawData || rawData.length === 0) {
+        console.log("No points history data");
+        return;
+    }
+
+    const labels = rawData.map(item => item.date);
+    const points = rawData.map(item => item.points);
+
+    new Chart(document.getElementById('pointsChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Points',
+                data: points,
+                borderColor: '#00ff80',
+                backgroundColor: 'rgba(0, 255, 128, 0.1)',
+                tension: 0.3,
+                borderWidth: 3,
+                pointRadius: 5,
+                pointBackgroundColor: '#ffd700'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            return tooltipItems[0].label;
+                        },
+                        label: function(context) {
+                            const item = rawData[context.dataIndex];
+                            if (item.tooltip) {
+                                return item.tooltip.split('\n');
+                            }
+                            return context.raw + " points";
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    grid: { color: '#333' },
+                    ticks: { color: '#aaa' }
+                },
+                x: { 
+                    grid: { color: '#333' },
+                    ticks: { color: '#aaa', maxTicksLimit: 12 }
+                }
+            }
+        }
+    });
+});
+</script>
 
 {% endblock %}

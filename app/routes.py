@@ -437,8 +437,6 @@ def clear_result(match_id):
 
 
 # ==================== PROFILE ====================
-from datetime import datetime
-
 @bp.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
@@ -455,19 +453,12 @@ def profile():
         flash("Profile updated successfully!", "success")
         return redirect(url_for("main.profile"))
 
-    # Get all user bets
     all_bets = Bet.query.filter_by(user_id=current_user.id).all()
 
-    group_history = []
-    knockout_history = []
+    group_history = [bet for bet in all_bets if bet.match]
+    knockout_history = [bet for bet in all_bets if not bet.match]
 
-    for bet in all_bets:
-        if bet.match:                    # Group Stage
-            group_history.append(bet)
-        else:                            # Knockout Stage
-            knockout_history.append(bet)
-
-    # === Sort Group Stage: by Group (A-L) then by Date ===
+    # Sorting (same as before)
     def group_sort_key(b):
         group_order = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,'K':10,'L':11}
         group_val = b.match.group if b.match and b.match.group else 'Z'
@@ -475,18 +466,88 @@ def profile():
         return (group_order.get(group_val, 99), date_val)
 
     group_history.sort(key=group_sort_key)
-
-    # Sort Knockout newest first
     knockout_history.sort(key=lambda b: b.match_id or 0, reverse=True)
 
-    # Knockout lookup
     knockout_matches = {km.match_number: km for km in KnockoutMatch.query.all()}
+
+        # ====================== ACCURATE POINTS HISTORY FOR GRAPH ======================
+    import json
+    from datetime import datetime
+    from collections import defaultdict
+
+    points_history = []
+    current_points = 1000  # Starting points
+
+    # Starting point with all bonuses
+    bonus_total = 0
+    bonus_desc = ""
+    if getattr(current_user, 'bonus_claimed', False):
+        bonus_total += 1000
+        bonus_desc += " + Gold Bonus"
+    if getattr(current_user, 'bread_bonus_claimed', False):
+        bonus_total += 500
+        bonus_desc += " + Bread"
+    if getattr(current_user, 'pancake_bonus_claimed', False):
+        bonus_total += 200
+        bonus_desc += " + Pancake"
+    if getattr(current_user, 'lomo_bonus_claimed', False):
+        bonus_total += 300
+        bonus_desc += " + Lomo"
+
+    current_points += bonus_total
+    points_history.append({
+        "date": "Start",
+        "points": current_points,
+        "tooltip": f"Starting Points{bonus_desc} (+{bonus_total})"
+    })
+
+    # Group results by date for cleaner display
+    daily_results = defaultdict(list)
+
+    sorted_bets = sorted(all_bets, key=lambda b: 
+        (b.match.date if b.match and b.match.date else 
+         (knockout_matches.get(b.match_id).date if knockout_matches.get(b.match_id) else datetime.min)))
+
+    for bet in sorted_bets:
+        if bet.points and bet.points > 0:   # Only when result is settled
+            stake = bet.stake or 50
+            net = bet.points - stake
+
+            # Get match name
+            if bet.match:
+                match_name = f"{bet.match.team1} vs {bet.match.team2}"
+            else:
+                km = knockout_matches.get(bet.match_id)
+                match_name = f"{km.team1 or 'TBD'} vs {km.team2 or 'TBD'}" if km else f"Knockout {bet.match_id}"
+
+            date_str = (bet.match.date.strftime('%Y-%m-%d') if bet.match and bet.match.date else 
+                       (knockout_matches.get(bet.match_id).date.strftime('%Y-%m-%d') if knockout_matches.get(bet.match_id) else "Unknown"))
+            
+            daily_results[date_str].append({
+                "match": match_name,
+                "net": net
+            })
+
+    # Build final history with correct cumulative points
+    for date_str, matches in sorted(daily_results.items()):
+        tooltip_lines = [f"{m['match']} {'+' if m['net'] > 0 else ''}{m['net']}" for m in matches]
+        
+        # Update running total
+        for m in matches:
+            current_points += m['net']
+
+        points_history.append({
+            "date": date_str,
+            "points": current_points,
+            "tooltip": "\n".join(tooltip_lines)
+        })
 
     return render_template("profile.html",
                            group_history=group_history,
                            knockout_history=knockout_history,
                            knockout_matches=knockout_matches,
-                           total_points=current_user.current_points)
+                           total_points=current_user.current_points,
+                           points_history=json.dumps(points_history))
 
 
 # ==================== USER PROFILE API (for modal) ====================
@@ -1161,3 +1222,4 @@ def db_remove_fk():
         return "<h2>✅ Foreign Key Removed. You can now use match_id for knockout too.</h2>"
     except Exception as e:
         return f"Error: {e}"
+
