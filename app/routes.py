@@ -234,15 +234,95 @@ def my_bets():
                            knockout_matches=knockout_matches,
                            now=now_hkt())
 
-
 @bp.route("/leaderboard")
+@login_required
 def leaderboard():
     users = User.query.all()
+    users.sort(key=lambda u: u.current_points, reverse=True)
+    
+    global_points_data = get_global_points_history()
 
-    # Sort by dynamic current_points (most accurate)
-    users = sorted(users, key=lambda u: u.current_points, reverse=True)
+    print("DEBUG: globalPointsData being sent:", bool(global_points_data.get("labels")))  # ← Add this line
 
-    return render_template("leaderboard.html", users=users)
+    return render_template("leaderboard.html",
+                           users=users,
+                           globalPointsData=global_points_data)  
+
+@bp.route('/test-global-data')
+def test_global_data():
+    return {
+        "labels": ["Jun 29", "Jun 30", "Jul 01"],
+        "datasets": [
+            {"label": "wanj", "data": [1000, 950, 1450], "borderColor": "#00ff80"},
+            {"label": "testuser", "data": [1000, 1200, 1100], "borderColor": "#00f0ff"}
+        ]
+    }
+
+
+from collections import defaultdict
+from datetime import datetime
+def get_global_points_history():
+    """Final robust version"""
+    users = User.query.all()
+    if not users:
+        return {"labels": [], "datasets": []}
+
+    all_bets = Bet.query.all()
+    daily_changes = defaultdict(lambda: defaultdict(int))
+
+    print(f"DEBUG: Found {len(all_bets)} total bets")
+
+    for bet in all_bets:
+        match = bet.match  # Group Stage first
+        if not match:
+            match = KnockoutMatch.query.filter_by(match_number=bet.match_id).first()
+
+        if not match or not match.date:
+            continue
+
+        # === VERY LENIENT FINISHED CHECK ===
+        is_finished = False
+        
+        # Group Stage
+        if hasattr(match, 'result') and match.result is not None:
+            is_finished = True
+        # Knockout Stage
+        elif hasattr(match, 'is_completed') and match.is_completed is True:
+            is_finished = True
+        # Extra safety for knockout
+        elif bet.match_id and KnockoutMatch.query.filter_by(match_number=bet.match_id, is_completed=True).first():
+            is_finished = True
+
+        if is_finished:
+            date_str = match.date.strftime('%Y-%m-%d')
+            net = bet.points or 0
+            daily_changes[date_str][bet.user_id] += net
+            print(f"DEBUG: Settled bet on {date_str} | User {bet.user_id} | Net {net}")
+
+    dates = sorted(daily_changes.keys())
+    print(f"DEBUG: Final settled dates = {dates}")
+
+    datasets = []
+    colors = ['#00ff80', '#00f0ff', '#c724ff', '#ffd700', '#ff00ff']
+
+    for i, user in enumerate(users):
+        data_points = [daily_changes[date].get(user.id, 0) for date in dates]
+        color = colors[i % len(colors)]
+        
+        datasets.append({
+            "label": user.username,
+            "data": data_points,
+            "borderColor": color,
+            "backgroundColor": color + "22",
+            "tension": 0.3,
+            "borderWidth": 2.5,
+            "pointRadius": 4
+        })
+
+    return {
+        "labels": [datetime.strptime(d, '%Y-%m-%d').strftime('%b %d') for d in dates],
+        "datasets": datasets
+    }
 
 
 from app.models import Bet, KnockoutMatch  # Ensure you have this import
@@ -605,7 +685,7 @@ def user_profile_api(user_id):
                 "round": km.round_name,
                 "match": f"{km.team1 or 'TBD'} vs {km.team2 or 'TBD'}",
                 "your_bet": f"{bet.home_score} - {bet.away_score}",
-                "match_result": f"{km.home_score} - {km.away_score}{penalty_str}",
+                "match_result": f"{km.home_score} - {km.away_score}<br>{penalty_str}",
                 "outcome": outcome
             })
 

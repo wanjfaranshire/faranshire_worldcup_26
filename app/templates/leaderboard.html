@@ -20,6 +20,7 @@
 
 <div class="container py-4">
     <div class="row justify-content-center">
+        <!-- Narrow container for ranking table -->
         <div class="col-lg-8 col-xl-7">
             <h1 class="mb-4 text-white">Leaderboard</h1>
 
@@ -37,17 +38,10 @@
                             {% for user in users %}
                             <tr class="user-row" data-user-id="{{ user.id }}" style="cursor: pointer;">
                                 <td class="fw-bold text-center">
-                                    {% if loop.index == 1 %}🥇
-                                    {% elif loop.index == 2 %}🥈
-                                    {% elif loop.index == 3 %}🥉
-                                    {% else %}{{ loop.index }}{% endif %}
+                                    {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
                                 </td>
-                                <td>
-                                    <span class="text-white">{{ user.username }}</span>
-                                </td>
-                                <td class="text-end fw-bold text-warning">
-                                    {{ user.current_points }}
-                                </td>
+                                <td><span class="text-white">{{ user.username }}</span></td>
+                                <td class="text-end fw-bold text-warning">{{ user.current_points }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -56,8 +50,48 @@
             </div>
         </div>
     </div>
+
+<h5 class="text-info mb-3 mt-5">Points Progression (All Players)</h5>
+<div class="card bg-dark border-secondary shadow">
+    <div class="card-body p-3">
+        <div style="height: 520px; width: 100%; max-width: 1100px; margin: 0 auto;">
+            <canvas id="globalPointsChart"></canvas>
+        </div>
+    </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('globalPointsChart');
+    
+    // Debug what is actually available
+    console.log("globalPointsData from Jinja:", {{ globalPointsData | tojson | safe }});
+
+    if (ctx && {{ globalPointsData | tojson | safe }} && {{ globalPointsData | tojson | safe }}.labels && {{ globalPointsData | tojson | safe }}.labels.length > 0) {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ globalPointsData | tojson | safe }}.labels,
+                datasets: {{ globalPointsData | tojson | safe }}.datasets || []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { color: '#ddd' } }
+                },
+                scales: {
+                    y: { min: 0, grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                    x: { grid: { color: '#333' }, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+    } else if (ctx) {
+        console.log("No data available for chart");
+    }
+});
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 

@@ -369,21 +369,28 @@ border-radius: 10pt;">
     </form>
 
 <!-- Smart Auto Scroll to Next Upcoming Match -->
-<!-- Smart Auto Scroll to Next Upcoming Match with Top Margin -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    if (!window.location.search.includes('view=time')) return;
+    if (new URLSearchParams(window.location.search).get('view') !== 'time') return;
 
     setTimeout(() => {
         const now = new Date();
         let nextMatchCard = null;
         let closestTimeDiff = Infinity;
 
-        document.querySelectorAll('#date-view-container .match-card').forEach(card => {
-            const timeStr = card.dataset.matchTime;
+        // Look for all match cards in date view
+        document.querySelectorAll('#knockout-date-container .match-card').forEach(card => {
+            // Try multiple possible data attributes
+            let timeStr = card.dataset.matchTime || 
+                         card.dataset.date || 
+                         card.querySelector('.card-header')?.textContent;
+
             if (!timeStr) return;
 
+            // Extract date from card header if needed
             const matchTime = new Date(timeStr);
+            if (isNaN(matchTime)) return;
+
             const timeDiff = matchTime - now;
 
             if (timeDiff > 0 && timeDiff < closestTimeDiff) {
@@ -392,21 +399,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Fallback to first card
         if (!nextMatchCard) {
-            nextMatchCard = document.querySelector('#date-view-container .match-card');
+            nextMatchCard = document.querySelector('#knockout-date-container .match-card');
         }
 
         if (nextMatchCard) {
-            const navbarHeight = 130; // Adjust this if your navbar is taller
-
+            const navbarHeight = 140; // adjust if needed
             const cardPosition = nextMatchCard.getBoundingClientRect().top + window.scrollY;
             
             window.scrollTo({
-                top: cardPosition - navbarHeight - 20,   // 20px extra breathing room
+                top: cardPosition - navbarHeight - 40,
                 behavior: "smooth"
             });
         }
-    }, 500);
+    }, 800); // slightly longer delay for page to fully render
 });
 </script>
 
