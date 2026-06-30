@@ -554,7 +554,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Only run if we are in 'time' view
     if (new URLSearchParams(window.location.search).get('view') !== 'time') return;
 
     setTimeout(() => {
@@ -562,36 +561,42 @@ document.addEventListener('DOMContentLoaded', function() {
         let nextMatchCard = null;
         let closestTimeDiff = Infinity;
 
-        // Target the container we added above
+        // Look for all match cards in date view
         document.querySelectorAll('#knockout-date-container .match-card').forEach(card => {
-            const timeStr = card.dataset.matchTime;
+            // Try multiple possible data attributes
+            let timeStr = card.dataset.matchTime || 
+                         card.dataset.date || 
+                         card.querySelector('.card-header')?.textContent;
+
             if (!timeStr) return;
 
+            // Extract date from card header if needed
             const matchTime = new Date(timeStr);
+            if (isNaN(matchTime)) return;
+
             const timeDiff = matchTime - now;
 
-            // Find the closest future match
             if (timeDiff > 0 && timeDiff < closestTimeDiff) {
                 closestTimeDiff = timeDiff;
                 nextMatchCard = card;
             }
         });
 
-        // Fallback: if no future match, scroll to the top
+        // Fallback to first card
         if (!nextMatchCard) {
             nextMatchCard = document.querySelector('#knockout-date-container .match-card');
         }
 
         if (nextMatchCard) {
-            const navbarHeight = 130; // Adjust based on your nav size
+            const navbarHeight = 140; // adjust if needed
             const cardPosition = nextMatchCard.getBoundingClientRect().top + window.scrollY;
             
             window.scrollTo({
-                top: cardPosition - navbarHeight - 30,
+                top: cardPosition - navbarHeight,
                 behavior: "smooth"
             });
         }
-    }, 700);
+    }, 800); // slightly longer delay for page to fully render
 });
 </script>
 
@@ -606,11 +611,13 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="card bg-dark border-light shadow-lg hover-card d-flex flex-column match-card teams-tba {{ display_class }}"
      style="width: 400px; height: 430px;" 
      data-match-id="{{ match.match_number }}"
+     data-match-time="{{ match.date.isoformat() }}"
      data-match-name="Teams TBA">
 {% else %}
 <div class="card bg-dark border-light shadow-lg hover-card d-flex flex-column match-card {{ display_class }}"
      style="width: 400px; height: 430px;" 
      data-match-id="{{ match.match_number }}"
+     data-match-time="{{ match.date.isoformat() }}"
      data-match-name="{{ (match.team1 or match.home_placeholder) }} vs {{ (match.team2 or match.away_placeholder) }}">
 {% endif %}
 
